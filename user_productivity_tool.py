@@ -28,6 +28,7 @@ USER_PRODUCTIVITY_ACTION_WEIGHTS = {
 
 # ===== CORE LOGIC =====
 
+
 def _normalize_key(value):
     return str(value or "").strip().lower().replace(" ", "_")
 
@@ -113,7 +114,11 @@ def _normalize_productivity_action_weights(action_weights=None):
 
 
 def _productivity_action_weight(action, action_weights=None):
-    weights = action_weights if action_weights is not None else USER_PRODUCTIVITY_ACTION_WEIGHTS
+    weights = (
+        action_weights
+        if action_weights is not None
+        else USER_PRODUCTIVITY_ACTION_WEIGHTS
+    )
     return float(weights.get(action, _productivity_default_action_weight(action)))
 
 
@@ -138,7 +143,9 @@ def _validate_action_log_headers(fieldnames):
         if not normalized.intersection(aliases)
     ]
     if missing:
-        raise ValueError("Action log CSV is missing required columns: " + ", ".join(missing))
+        raise ValueError(
+            "Action log CSV is missing required columns: " + ", ".join(missing)
+        )
 
 
 def _detect_action_log_dialect(sample):
@@ -188,13 +195,20 @@ def build_user_productivity_report(
     if selected_users is not None:
         selected_user_set = {str(username) for username in selected_users}
         rows = [row for row in rows if row["username"] in selected_user_set]
-        selected_users = sorted(selected_user_set, key=lambda username: username.lower())
+        selected_users = sorted(
+            selected_user_set, key=lambda username: username.lower()
+        )
     rows.sort(key=lambda row: (row["username"].lower(), row["dt"], row["action"]))
 
     deduped = []
     seen = set()
     for row in rows:
-        key = (row["day"], row["dt"].strftime("%H:%M:%S"), row["username"], row["action"])
+        key = (
+            row["day"],
+            row["dt"].strftime("%H:%M:%S"),
+            row["username"],
+            row["action"],
+        )
         if key in seen:
             continue
         seen.add(key)
@@ -208,7 +222,9 @@ def build_user_productivity_report(
     skipped_long = 0
 
     for row in deduped:
-        user_action_volumes[(row["username"], row["action"])] = user_action_volumes.get((row["username"], row["action"]), 0) + 1
+        user_action_volumes[(row["username"], row["action"])] = (
+            user_action_volumes.get((row["username"], row["action"]), 0) + 1
+        )
         action_volumes[row["action"]] = action_volumes.get(row["action"], 0) + 1
 
     for idx, row in enumerate(deduped):
@@ -224,13 +240,22 @@ def build_user_productivity_report(
         if delta_seconds > threshold_seconds:
             skipped_long += 1
             continue
-        user_durations.setdefault((row["username"], row["action"]), []).append(delta_seconds)
+        user_durations.setdefault((row["username"], row["action"]), []).append(
+            delta_seconds
+        )
         action_durations.setdefault(row["action"], []).append(delta_seconds)
 
-    all_actions = sorted(set(action_durations.keys()) | set(action_volumes.keys()), key=_productivity_action_sort_key)
+    all_actions = sorted(
+        set(action_durations.keys()) | set(action_volumes.keys()),
+        key=_productivity_action_sort_key,
+    )
     if selected_actions is None:
         default_set = set(USER_PRODUCTIVITY_DEFAULT_ACTIONS)
-        actions = [action for action in USER_PRODUCTIVITY_DEFAULT_ACTIONS if action in all_actions and action in default_set]
+        actions = [
+            action
+            for action in USER_PRODUCTIVITY_DEFAULT_ACTIONS
+            if action in all_actions and action in default_set
+        ]
         if not actions:
             actions = all_actions
         selected_actions = actions
@@ -242,17 +267,21 @@ def build_user_productivity_report(
     users = sorted(
         {
             username
-            for username, action in (set(user_durations.keys()) | set(user_action_volumes.keys()))
+            for username, action in (
+                set(user_durations.keys()) | set(user_action_volumes.keys())
+            )
             if action in actions
         },
         key=lambda username: username.lower(),
     )
     user_active_days = {
-        username: len({
-            row["dt"].date().isoformat()
-            for row in deduped
-            if row["username"] == username and row["action"] in actions
-        })
+        username: len(
+            {
+                row["dt"].date().isoformat()
+                for row in deduped
+                if row["username"] == username and row["action"] in actions
+            }
+        )
         for username in users
     }
 
@@ -264,12 +293,20 @@ def build_user_productivity_report(
         if durations:
             combined_results.append((action, avg_seconds, len(durations)))
         avg_volume = (
-            sum(
-                (user_action_volumes.get((username, action), 0) / user_active_days.get(username, 1))
-                for username in users
-                if user_active_days.get(username, 0)
-            ) / len(users)
-        ) if users else 0
+            (
+                sum(
+                    (
+                        user_action_volumes.get((username, action), 0)
+                        / user_active_days.get(username, 1)
+                    )
+                    for username in users
+                    if user_active_days.get(username, 0)
+                )
+                / len(users)
+            )
+            if users
+            else 0
+        )
         reference[action] = {
             "avg_seconds": avg_seconds,
             "duration": _fmt_mmss_millis(avg_seconds) if durations else "",
@@ -284,14 +321,23 @@ def build_user_productivity_report(
     ranking = []
     reference_total_volume = sum(action_volumes.get(action, 0) for action in actions)
     reference_avg_volume_per_user = (
-        sum(
-            sum(user_action_volumes.get((username, action), 0) for action in actions) / user_active_days.get(username, 1)
-            for username in users
-            if user_active_days.get(username, 0)
-        ) / len(users)
-    ) if users else 0
+        (
+            sum(
+                sum(
+                    user_action_volumes.get((username, action), 0) for action in actions
+                )
+                / user_active_days.get(username, 1)
+                for username in users
+                if user_active_days.get(username, 0)
+            )
+            / len(users)
+        )
+        if users
+        else 0
+    )
     weighted_reference_avg_volume_per_user = sum(
-        (reference.get(action, {}).get("avg_volume") or 0) * _productivity_action_weight(action, action_weights)
+        (reference.get(action, {}).get("avg_volume") or 0)
+        * _productivity_action_weight(action, action_weights)
         for action in actions
     )
 
@@ -324,7 +370,15 @@ def build_user_productivity_report(
             avg_daily_volume_total += avg_daily_volume
             weighted_avg_daily_volume_total += avg_daily_volume * action_weight
             reference_avg_volume = reference.get(action, {}).get("avg_volume") or 0
-            volume_delta = ((avg_daily_volume - reference_avg_volume) / reference_avg_volume * 100.0) if reference_avg_volume else None
+            volume_delta = (
+                (
+                    (avg_daily_volume - reference_avg_volume)
+                    / reference_avg_volume
+                    * 100.0
+                )
+                if reference_avg_volume
+                else None
+            )
             volume_cells[action] = f"{avg_daily_volume:.1f}"
             total_volume_cells[action] = str(volume_count)
             volume_delta_values[action] = volume_delta
@@ -351,51 +405,69 @@ def build_user_productivity_report(
                 display_cells[action] = ""
                 counts[action] = 0
 
-        volume_factor = (weighted_avg_daily_volume_total / weighted_reference_avg_volume_per_user) if weighted_reference_avg_volume_per_user else None
+        volume_factor = (
+            (weighted_avg_daily_volume_total / weighted_reference_avg_volume_per_user)
+            if weighted_reference_avg_volume_per_user
+            else None
+        )
         speed_factor = (weighted_speed_ratio / speed_weight) if speed_weight else None
-        score = (volume_factor * speed_factor * 100.0) if volume_factor is not None and speed_factor is not None else None
+        score = (
+            (volume_factor * speed_factor * 100.0)
+            if volume_factor is not None and speed_factor is not None
+            else None
+        )
         avg_duration = (user_duration_total / speed_weight) if speed_weight else None
-        reference_avg_duration = (reference_duration_total / speed_weight) if speed_weight else None
-        ranking.append({
-            "username": username,
-            "display_name": username,
-            "total_volume": total_volume,
-            "weighted_total_volume": weighted_total_volume,
-            "weighted_total_volume_display": f"{weighted_total_volume:.1f}",
-            "active_days": active_days,
-            "avg_daily_volume": avg_daily_volume_total,
-            "avg_daily_volume_display": f"{avg_daily_volume_total:.1f}",
-            "weighted_avg_daily_volume": weighted_avg_daily_volume_total,
-            "weighted_avg_daily_volume_display": f"{weighted_avg_daily_volume_total:.1f}",
-            "volume_factor": volume_factor,
-            "volume_delta": _fmt_signed_percent((volume_factor - 1.0) * 100.0 if volume_factor is not None else None),
-            "speed_factor": speed_factor,
-            "speed_delta": _fmt_signed_percent((speed_factor - 1.0) * 100.0 if speed_factor is not None else None),
-            "avg_duration": _fmt_mmss_millis(avg_duration),
-            "reference_avg_duration": _fmt_mmss_millis(reference_avg_duration),
-            "score": score,
-            "score_display": _fmt_score(score),
-        })
-        matrix.append({
-            "username": username,
-            "display_name": username,
-            "cells": cells,
-            "deltas": deltas,
-            "display_cells": display_cells,
-            "counts": counts,
-            "volume_cells": volume_cells,
-            "total_volume_cells": total_volume_cells,
-            "volume_deltas": volume_deltas,
-            "volume_delta_values": volume_delta_values,
-            "total_volume": total_volume,
-            "weighted_total_volume": weighted_total_volume,
-            "weighted_total_volume_display": f"{weighted_total_volume:.1f}",
-            "active_days": active_days,
-            "avg_daily_volume": avg_daily_volume_total,
-            "avg_daily_volume_display": f"{avg_daily_volume_total:.1f}",
-            "weighted_avg_daily_volume": weighted_avg_daily_volume_total,
-            "weighted_avg_daily_volume_display": f"{weighted_avg_daily_volume_total:.1f}",
-        })
+        reference_avg_duration = (
+            (reference_duration_total / speed_weight) if speed_weight else None
+        )
+        ranking.append(
+            {
+                "username": username,
+                "display_name": username,
+                "total_volume": total_volume,
+                "weighted_total_volume": weighted_total_volume,
+                "weighted_total_volume_display": f"{weighted_total_volume:.1f}",
+                "active_days": active_days,
+                "avg_daily_volume": avg_daily_volume_total,
+                "avg_daily_volume_display": f"{avg_daily_volume_total:.1f}",
+                "weighted_avg_daily_volume": weighted_avg_daily_volume_total,
+                "weighted_avg_daily_volume_display": f"{weighted_avg_daily_volume_total:.1f}",
+                "volume_factor": volume_factor,
+                "volume_delta": _fmt_signed_percent(
+                    (volume_factor - 1.0) * 100.0 if volume_factor is not None else None
+                ),
+                "speed_factor": speed_factor,
+                "speed_delta": _fmt_signed_percent(
+                    (speed_factor - 1.0) * 100.0 if speed_factor is not None else None
+                ),
+                "avg_duration": _fmt_mmss_millis(avg_duration),
+                "reference_avg_duration": _fmt_mmss_millis(reference_avg_duration),
+                "score": score,
+                "score_display": _fmt_score(score),
+            }
+        )
+        matrix.append(
+            {
+                "username": username,
+                "display_name": username,
+                "cells": cells,
+                "deltas": deltas,
+                "display_cells": display_cells,
+                "counts": counts,
+                "volume_cells": volume_cells,
+                "total_volume_cells": total_volume_cells,
+                "volume_deltas": volume_deltas,
+                "volume_delta_values": volume_delta_values,
+                "total_volume": total_volume,
+                "weighted_total_volume": weighted_total_volume,
+                "weighted_total_volume_display": f"{weighted_total_volume:.1f}",
+                "active_days": active_days,
+                "avg_daily_volume": avg_daily_volume_total,
+                "avg_daily_volume_display": f"{avg_daily_volume_total:.1f}",
+                "weighted_avg_daily_volume": weighted_avg_daily_volume_total,
+                "weighted_avg_daily_volume_display": f"{weighted_avg_daily_volume_total:.1f}",
+            }
+        )
 
     ranking = sorted(
         ranking,
@@ -417,22 +489,34 @@ def build_user_productivity_report(
         "actions": actions,
         "all_actions": all_actions,
         "selected_actions": selected_actions,
-        "action_weights": {action: _productivity_action_weight(action, action_weights) for action in actions},
-        "all_action_weights": {action: _productivity_action_weight(action, action_weights) for action in all_actions},
+        "action_weights": {
+            action: _productivity_action_weight(action, action_weights)
+            for action in actions
+        },
+        "all_action_weights": {
+            action: _productivity_action_weight(action, action_weights)
+            for action in all_actions
+        },
         "users": users,
         "selected_users": selected_users,
         "reference": reference,
         "volume_reference": {
             "total_volume": reference_total_volume,
             "avg_volume_per_user": reference_avg_volume_per_user,
-            "avg_volume_display": f"{reference_avg_volume_per_user:.1f}" if users else "",
+            "avg_volume_display": f"{reference_avg_volume_per_user:.1f}"
+            if users
+            else "",
             "weighted_avg_volume_per_user": weighted_reference_avg_volume_per_user,
-            "weighted_avg_volume_display": f"{weighted_reference_avg_volume_per_user:.1f}" if users else "",
+            "weighted_avg_volume_display": f"{weighted_reference_avg_volume_per_user:.1f}"
+            if users
+            else "",
             "basis": "average_daily",
         },
         "ranking_reference": {
             "score_display": "100.0" if users else "",
-            "total_volume": f"{weighted_reference_avg_volume_per_user:.1f}" if users else "",
+            "total_volume": f"{weighted_reference_avg_volume_per_user:.1f}"
+            if users
+            else "",
             "volume_delta": "+0.0%" if users else "",
             "speed_delta": "+0.0%" if users else "",
             "avg_duration": "",
@@ -445,6 +529,7 @@ def build_user_productivity_report(
 
 
 # ===== MARKDOWN OUTPUT =====
+
 
 def _markdown_cell(value):
     return str(value if value is not None else "").replace("|", "\\|")
@@ -466,12 +551,16 @@ def render_user_productivity_md(report, input_source=None):
     lines.append("| Action | Weight |")
     lines.append("|---|---:|")
     for action in report.get("actions", []):
-        weight = report.get("action_weights", {}).get(action, _productivity_default_action_weight(action))
+        weight = report.get("action_weights", {}).get(
+            action, _productivity_default_action_weight(action)
+        )
         lines.append(f"| {_markdown_cell(action)} | {float(weight):.1f} |")
     lines.append("")
     lines.append("## User Productivity Ranking")
     lines.append("")
-    lines.append("| Rank | User | Total Actions | Weighted Total | Active Days | Weighted Daily Volume | Volume Delta | Speed Delta | Avg Duration | Score |")
+    lines.append(
+        "| Rank | User | Total Actions | Weighted Total | Active Days | Weighted Daily Volume | Volume Delta | Speed Delta | Avg Duration | Score |"
+    )
     lines.append("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     for row in report.get("ranking", []):
         lines.append(
@@ -493,12 +582,18 @@ def render_user_productivity_md(report, input_source=None):
     lines.append("")
     lines.append("| # | Action | Average Duration | Sample Size |")
     lines.append("|---:|---|---:|---:|")
-    for idx, (action, avg_sec, count) in enumerate(report.get("combined_results", []), start=1):
-        lines.append(f"| {idx} | {_markdown_cell(action)} | {_fmt_analyzer_duration(avg_sec)} | {count} |")
+    for idx, (action, avg_sec, count) in enumerate(
+        report.get("combined_results", []), start=1
+    ):
+        lines.append(
+            f"| {idx} | {_markdown_cell(action)} | {_fmt_analyzer_duration(avg_sec)} | {count} |"
+        )
     lines.append("")
     lines.append("## Per-User Average Durations")
     lines.append("")
-    users_sorted = sorted({username for username, _, _, _ in report.get("per_user_results", [])})
+    users_sorted = sorted(
+        {username for username, _, _, _ in report.get("per_user_results", [])}
+    )
     for user_idx, username in enumerate(users_sorted, start=1):
         user_rows = [
             (action, avg_sec, count)
@@ -510,13 +605,16 @@ def render_user_productivity_md(report, input_source=None):
         lines.append("| Action | Avg Duration | n |")
         lines.append("|---|---:|---:|")
         for action, avg_sec, count in user_rows:
-            lines.append(f"| {_markdown_cell(action)} | {_fmt_analyzer_duration(avg_sec)} | {count} |")
+            lines.append(
+                f"| {_markdown_cell(action)} | {_fmt_analyzer_duration(avg_sec)} | {count} |"
+            )
         lines.append("")
     lines.append("Generated on: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     return "\n".join(lines)
 
 
 # ===== ARGUMENT PARSING =====
+
 
 def parse_weight_arg(weight_arg):
     if "=" not in str(weight_arg):
@@ -530,7 +628,9 @@ def parse_weight_arg(weight_arg):
     except ValueError as exc:
         raise argparse.ArgumentTypeError("weight value must be numeric") from exc
     if not math.isfinite(weight) or weight < 0:
-        raise argparse.ArgumentTypeError("weight value must be a non-negative finite number")
+        raise argparse.ArgumentTypeError(
+            "weight value must be a non-negative finite number"
+        )
     return action, weight
 
 
@@ -538,20 +638,178 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Read a CCR Users actions CSV and write or display a Markdown user productivity report.",
     )
-    parser.add_argument("--gui", action="store_true", help="Open the graphical interface.")
+    parser.add_argument(
+        "--gui", action="store_true", help="Open the graphical interface."
+    )
     parser.add_argument("--input", help="Path to the Users actions CSV file.")
-    parser.add_argument("--output", help="Path for the Markdown report. Prints to stdout when omitted.")
-    parser.add_argument("--threshold-minutes", type=float, default=5.0, help="Maximum action-to-action gap to count as processing time.")
-    parser.add_argument("--action", action="append", dest="actions", help="Action to include. May be repeated.")
-    parser.add_argument("--user", action="append", dest="users", help="User to include. May be repeated.")
-    parser.add_argument("--weight", action="append", type=parse_weight_arg, default=[], help="Action weight as ACTION=NUMBER. May be repeated.")
+    parser.add_argument(
+        "--output", help="Path for the Markdown report. Prints to stdout when omitted."
+    )
+    parser.add_argument(
+        "--threshold-minutes",
+        type=float,
+        default=5.0,
+        help="Maximum action-to-action gap to count as processing time.",
+    )
+    parser.add_argument(
+        "--action",
+        action="append",
+        dest="actions",
+        help="Action to include. May be repeated.",
+    )
+    parser.add_argument(
+        "--user",
+        action="append",
+        dest="users",
+        help="User to include. May be repeated.",
+    )
+    parser.add_argument(
+        "--weight",
+        action="append",
+        type=parse_weight_arg,
+        default=[],
+        help="Action weight as ACTION=NUMBER. May be repeated.",
+    )
     args = parser.parse_args(argv)
     if not args.gui and argv and not args.input:
         parser.error("--input is required unless --gui is used")
     return args
 
 
+# ===== DESIGN TOKENS =====
+
+
+def _get_design_tokens(theme="light"):
+    """Centralized design tokens for consistent visual language."""
+    base = {
+        "spacing": {
+            "xs": 4,
+            "sm": 8,
+            "md": 16,
+            "lg": 24,
+            "xl": 32,
+            "2xl": 48,
+        },
+        "border_radius": {
+            "sm": 4,
+            "md": 8,
+            "lg": 12,
+            "xl": 16,
+            "full": 9999,
+        },
+        "shadow": {
+            "none": "0 0 0 0 transparent",
+            "xs": "0 1px 2px 0 rgba(0,0,0,0.05)",
+            "sm": "0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1)",
+            "md": "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)",
+            "lg": "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
+            "xl": "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+        },
+        "transition": {
+            "fast": 100,
+            "normal": 200,
+            "slow": 300,
+        },
+        "z_index": {
+            "base": 0,
+            "dropdown": 100,
+            "sticky": 200,
+            "modal": 300,
+            "popover": 400,
+            "tooltip": 500,
+        },
+    }
+
+    if theme == "dark":
+        base["color"] = {
+            # Base surfaces
+            "bg_primary": "#0f172a",  # Slate-950
+            "bg_secondary": "#1e293b",  # Slate-800
+            "bg_tertiary": "#253047",  # Elevated
+            "bg_hover": "#334155",  # Slate-700
+            "bg_active": "#1e293b",  # Slate-800
+            # Borders
+            "border_subtle": "#1e293b",  # Slate-800
+            "border_default": "#334155",  # Slate-700
+            "border_emphasis": "#475569",  # Slate-600
+            # Text
+            "text_primary": "#f1f5f9",  # Slate-50
+            "text_secondary": "#94a3b8",  # Slate-400
+            "text_muted": "#64748b",  # Slate-500
+            "text_inverse": "#0f172a",  # Slate-950
+            # Accent (Cyan)
+            "accent_primary": "#22d3ee",  # Cyan-400
+            "accent_hover": "#67e8f9",  # Cyan-300
+            "accent_active": "#0891b2",  # Cyan-600
+            "accent_bg": "#164e63",  # Cyan-900/800
+            "accent_text": "#0f172a",  # Slate-950
+            # Semantic
+            "success": "#22c55e",  # Green-500
+            "success_bg": "#14532d",  # Green-900
+            "success_text": "#dcfce7",  # Green-50
+            "warning": "#f59e0b",  # Amber-500
+            "warning_bg": "#78350f",  # Amber-900
+            "warning_text": "#fef9c3",  # Amber-50
+            "error": "#ef4444",  # Red-500
+            "error_bg": "#7f1d1d",  # Red-900
+            "error_text": "#fef2f2",  # Red-50
+            "info": "#3b82f6",  # Blue-500
+            "info_bg": "#1e3a5f",  # Blue-900
+            "info_text": "#dbeafe",  # Blue-50
+            # Selection
+            "select_bg": "#164e63",  # Cyan-900/800
+            "select_text": "#22d3ee",  # Cyan-400
+            # Zebra striping
+            "zebra_subtle": "#172033",  # Slightly darker than card
+        }
+    else:
+        base["color"] = {
+            # Base surfaces - increased contrast
+            "bg_primary": "#e2e8f0",  # Slate-200 (was Slate-50)
+            "bg_secondary": "#ffffff",  # White
+            "bg_tertiary": "#f1f5f9",  # Slate-100 (was Slate-50)
+            "bg_hover": "#cbd5e1",  # Slate-300 (was Slate-200)
+            "bg_active": "#e2e8f0",  # Slate-200
+            # Borders - darker for better contrast
+            "border_subtle": "#cbd5e1",  # Slate-300
+            "border_default": "#94a3b8",  # Slate-400 (was Slate-300)
+            "border_emphasis": "#64748b",  # Slate-500 (was Slate-400)
+            # Text - darker for better contrast
+            "text_primary": "#0f172a",  # Slate-950
+            "text_secondary": "#334155",  # Slate-700 (was Slate-600)
+            "text_muted": "#475569",  # Slate-600 (was Slate-500)
+            "text_inverse": "#ffffff",  # White
+            # Accent (Blue)
+            "accent_primary": "#2563eb",  # Blue-600
+            "accent_hover": "#1d4ed8",  # Blue-700
+            "accent_active": "#1e40af",  # Blue-800
+            "accent_bg": "#dbeafe",  # Blue-100
+            "accent_text": "#ffffff",  # White
+            # Semantic
+            "success": "#16a34a",  # Green-600
+            "success_bg": "#dcfce7",  # Green-100
+            "success_text": "#14532d",  # Green-900
+            "warning": "#d97706",  # Amber-600
+            "warning_bg": "#fef9c3",  # Amber-100
+            "warning_text": "#78350f",  # Amber-900
+            "error": "#dc2626",  # Red-600
+            "error_bg": "#fef2f2",  # Red-100
+            "error_text": "#7f1d1d",  # Red-900
+            "info": "#2563eb",  # Blue-600
+            "info_bg": "#dbeafe",  # Blue-100
+            "info_text": "#1e3a5f",  # Blue-900
+            # Selection
+            "select_bg": "#dbeafe",  # Blue-100
+            "select_text": "#1e40af",  # Blue-800
+            # Zebra striping
+            "zebra_subtle": "#f1f5f9",  # Slate-100 (was Slate-50)
+        }
+
+    return base
+
+
 # ===== GUI FUNCTIONS =====
+
 
 def discover_actions_for_gui(csv_path=None):
     actions = list(USER_PRODUCTIVITY_DEFAULT_ACTIONS)
@@ -561,8 +819,7 @@ def discover_actions_for_gui(csv_path=None):
             if action not in actions:
                 actions.append(action)
     weights = {
-        action: _productivity_default_action_weight(action)
-        for action in actions
+        action: _productivity_default_action_weight(action) for action in actions
     }
     return actions, weights
 
@@ -579,64 +836,68 @@ def run_gui():
     from tkinter import scrolledtext, ttk
     import tkinter.font as tkfont
 
+    # Add rounded rectangle method to Canvas
+    def _create_rounded_rect(self, x1, y1, x2, y2, radius=12, **kwargs):
+        """Create a rounded rectangle on the canvas."""
+        points = [
+            x1 + radius,
+            y1,
+            x2 - radius,
+            y1,
+            x2,
+            y1,
+            x2,
+            y1 + radius,
+            x2,
+            y2 - radius,
+            x2,
+            y2,
+            x2 - radius,
+            y2,
+            x1 + radius,
+            y2,
+            x1,
+            y2,
+            x1,
+            y2 - radius,
+            x1,
+            y1 + radius,
+            x1,
+            y1,
+        ]
+        return self.create_polygon(points, smooth=True, **kwargs)
+
+    tk.Canvas.create_rounded_rect = _create_rounded_rect
+
     class UserProductivityApp:
         def __init__(self, root):
             self.tk = tk
             self.root = root
             self.root.title("User Productivity Tool")
-            
+
             # Background task queue for thread-safe UI updates
             import queue
             import threading
+
             self._queue = queue
             self._threading = threading
             self._task_queue = queue.Queue()
             self._bg_thread = None
-            
-            # Set up proper font detection first
-            self._setup_fonts()
-            
-            # Define palettes according to specification
-            self.PALETTES = {
-                "dark": {
-                    "app": "#0f172a",      # Slate-950
-                    "card": "#1e293b",     # Slate-800
-                    "input": "#0f172a",    # Slate-950
-                    "border": "#334155",   # Slate-700
-                    "text": "#f1f5f9",     # Slate-50
-                    "text2": "#94a3b8",    # Slate-400
-                    "accent": "#22d3ee",   # Cyan-400
-                    "accent_text": "#0f172a", # Slate-950
-                    "accent_hover": "#67e8f9", # Cyan-300
-                    "select": "#164e63",   # Slate-900/800 mix
-                    "zebra": "#172033",    # Darker card
-                },
-                "light": {
-                    "app": "#f1f5f9",      # Slate-50
-                    "card": "#ffffff",     # White
-                    "input": "#ffffff",    # White
-                    "border": "#cbd5e1",   # Slate-200
-                    "text": "#0f172a",     # Slate-950
-                    "text2": "#475569",    # Slate-600
-                    "accent": "#2563eb",   # Blue-600 (changed from 500 for better contrast)
-                    "accent_text": "#ffffff", # White
-                    "accent_hover": "#1d4ed8", # Blue-700
-                    "select": "#dbeafe",   # Blue-100
-                    "zebra": "#f8fafc",    # Slate-50
-                }
-            }
-            
+
+            # Initialize theme variable before font setup
             self.current_theme = tk.StringVar(value="light")
             self.csv_path_var = tk.StringVar()
             self.threshold_var = tk.StringVar(value="5")
-            self.status_var = tk.StringVar(value="Select a user action log CSV to begin.")
+            self.status_var = tk.StringVar(
+                value="Select a user action log CSV to begin."
+            )
             self.current_markdown = ""
             self.current_report = None
             self.action_rows = []
             self.user_rows = []
             self.ranking_sort_var = tk.StringVar(value="Score")
             self.ranking_desc_var = tk.BooleanVar(value=True)
-            
+
             # Widget references for theme updates
             self.weights_canvas = None
             self.users_canvas = None
@@ -644,27 +905,82 @@ def run_gui():
             self.ranking_tree = None
             self.details_tree = None
             self.info_text_widgets = []
-            
+
+            # Set up proper font detection first
+            self._setup_fonts()
+
+            # Define palettes according to specification
+            self.PALETTES = {
+                "dark": {
+                    "app": "#0f172a",  # Slate-950
+                    "card": "#1e293b",  # Slate-800
+                    "input": "#0f172a",  # Slate-950
+                    "border": "#334155",  # Slate-700
+                    "text": "#f1f5f9",  # Slate-50
+                    "text2": "#94a3b8",  # Slate-400
+                    "accent": "#22d3ee",  # Cyan-400
+                    "accent_text": "#0f172a",  # Slate-950
+                    "accent_hover": "#67e8f9",  # Cyan-300
+                    "select": "#164e63",  # Slate-900/800 mix
+                    "zebra": "#172033",  # Darker card
+                },
+                "light": {
+                    "app": "#f1f5f9",  # Slate-50
+                    "card": "#ffffff",  # White
+                    "input": "#ffffff",  # White
+                    "border": "#cbd5e1",  # Slate-200
+                    "text": "#0f172a",  # Slate-950
+                    "text2": "#475569",  # Slate-600
+                    "accent": "#2563eb",  # Blue-600 (changed from 500 for better contrast)
+                    "accent_text": "#ffffff",  # White
+                    "accent_hover": "#1d4ed8",  # Blue-700
+                    "select": "#dbeafe",  # Blue-100
+                    "zebra": "#f8fafc",  # Slate-50
+                },
+            }
+
+            self.current_theme = tk.StringVar(value="light")
+            self.csv_path_var = tk.StringVar()
+            self.threshold_var = tk.StringVar(value="5")
+            self.status_var = tk.StringVar(
+                value="Select a user action log CSV to begin."
+            )
+            self.current_markdown = ""
+            self.current_report = None
+            self.action_rows = []
+            self.user_rows = []
+            self.ranking_sort_var = tk.StringVar(value="Score")
+            self.ranking_desc_var = tk.BooleanVar(value=True)
+
+            # Widget references for theme updates
+            self.weights_canvas = None
+            self.users_canvas = None
+            self.result_text = None
+            self.ranking_tree = None
+            self.details_tree = None
+            self.info_text_widgets = []
+
             self._apply_theme()
             self._setup_layout()
             self.root.columnconfigure(0, weight=1)
             self.root.rowconfigure(0, weight=1)
             self.root.minsize(1000, 700)
             self.root.geometry("1200x800")
-            
+
             # Initialize with empty states
             self.set_action_rows(*discover_actions_for_gui())
             self.set_user_rows([])
-            
+
             # Start queue polling
             self._poll_task_queue()
-            
+
             # Auto-load sample CSV for testing after 2 seconds
             self.root.after(2000, self._auto_load_sample_csv_test)
 
         def _auto_load_sample_csv_test(self):
             """Automatically load sample CSV for testing."""
             import os
+
             sample_path = os.path.join(os.path.dirname(__file__), "sample.csv")
             if os.path.exists(sample_path):
                 self.csv_path_var.set(sample_path)
@@ -681,7 +997,9 @@ def run_gui():
                         # Show callback exception in status bar for debugging
                         original_status = self.status_var.get()
                         self.status_var.set(f"Callback error: {str(e)}")
-                        self.root.after(2000, lambda: self.status_var.set(original_status))
+                        self.root.after(
+                            2000, lambda: self.status_var.set(original_status)
+                        )
             except self._queue.Empty:
                 pass
             # Schedule next poll
@@ -689,6 +1007,7 @@ def run_gui():
 
         def _run_in_background(self, task_func, on_done, on_error=None):
             """Run a function in a background thread, call on_done/on_error on main thread."""
+
             def worker():
                 try:
                     result = task_func()
@@ -697,13 +1016,16 @@ def run_gui():
                     if on_error:
                         self._task_queue.put(lambda: on_error(exc))
                     else:
-                        self._task_queue.put(lambda: self._show_error("Background task failed", str(exc)))
-            
+                        self._task_queue.put(
+                            lambda: self._show_error("Background task failed", str(exc))
+                        )
+
             self._bg_thread = self._threading.Thread(target=worker, daemon=True)
             self._bg_thread.start()
 
         def _show_error(self, title, message):
             from tkinter import messagebox
+
             messagebox.showerror(title, message)
             self.status_var.set(f"Error: {message}")
 
@@ -712,12 +1034,18 @@ def run_gui():
             if busy:
                 self.root.config(cursor="watch")
                 # Disable main action buttons
-                for widget in [getattr(self, 'generate_btn', None), getattr(self, 'export_btn', None)]:
+                for widget in [
+                    getattr(self, "generate_btn", None),
+                    getattr(self, "export_btn", None),
+                ]:
                     if widget:
                         widget.config(state="disabled")
             else:
                 self.root.config(cursor="")
-                for widget in [getattr(self, 'generate_btn', None), getattr(self, 'export_btn', None)]:
+                for widget in [
+                    getattr(self, "generate_btn", None),
+                    getattr(self, "export_btn", None),
+                ]:
                     if widget:
                         widget.config(state="normal")
 
@@ -726,7 +1054,7 @@ def run_gui():
             available_families = set(tkfont.families())
             preferred_sans = ["Inter", "Ubuntu", "Segoe UI", "DejaVu Sans"]
             preferred_mono = ["JetBrains Mono", "DejaVu Sans Mono"]
-            
+
             # Find first available sans font
             sans_font = None
             for font in preferred_sans:
@@ -735,7 +1063,7 @@ def run_gui():
                     break
             if not sans_font:
                 sans_font = "sans-serif"  # fallback
-                
+
             # Find first available mono font
             mono_font = None
             for font in preferred_mono:
@@ -744,496 +1072,755 @@ def run_gui():
                     break
             if not mono_font:
                 mono_font = "monospace"  # fallback
-                
+
             self.sans_font = sans_font
             self.mono_font = mono_font
-            
+
+            # Design tokens for spacing
+            self.tokens = _get_design_tokens(self.current_theme.get())
+            self.spacing = self.tokens["spacing"]
+
             # Named fonts for consistent usage across all styles
-            self.fUI = (sans_font, 10)          # Base UI font
-            self.fUIBold = (sans_font, 10, "bold")  # Bold UI font
-            self.fSmall = (sans_font, 9)        # Small headers (Use, Action, Weight, etc.)
-            self.fMono = (mono_font, 10)        # Monospace for code/markdown
-            
+            # Base size increased from 10pt to 11pt for better readability
+            self.fUI = (sans_font, 11)  # Base UI font (Regular 400)
+            self.fUIMedium = (sans_font, 11, "normal")  # Medium (500) - simulated
+            self.fUISemibold = (sans_font, 11, "bold")  # Semibold (600)
+            self.fUIBold = (sans_font, 11, "bold")  # Bold (700)
+            self.fSmall = (sans_font, 10)  # Small headers (Use, Action, Weight, etc.)
+            self.fSmallBold = (sans_font, 10, "bold")
+            self.fMono = (mono_font, 10)  # Monospace for code/markdown
+            self.fMonoSmall = (mono_font, 9)
+            self.fHeading = (sans_font, 14, "bold")  # Section headings
+            self.fDisplay = (sans_font, 20, "bold")  # Large numbers (score badges)
+            self.fCaption = (sans_font, 9)  # Captions, helper text
+
             # Configure default Tk named fonts
             default_font = tkfont.nametofont("TkDefaultFont")
-            default_font.configure(family=sans_font, size=10)
-            
+            default_font.configure(family=sans_font, size=11)
+
             text_font = tkfont.nametofont("TkTextFont")
-            text_font.configure(family=sans_font, size=10)
-            
+            text_font.configure(family=sans_font, size=11)
+
             heading_font = tkfont.nametofont("TkHeadingFont")
-            heading_font.configure(family=sans_font, size=10, weight="bold")
-            
+            heading_font.configure(family=sans_font, size=14, weight="bold")
+
             menu_font = tkfont.nametofont("TkMenuFont")
-            menu_font.configure(family=sans_font, size=10)
-            
+            menu_font.configure(family=sans_font, size=11)
+
             # Set combobox dropdown list font
             self.root.option_add("*TCombobox*Listbox.font", self.fUI)
 
-        def _get_palette(self):
-            """Get current theme palette."""
-            theme = self.current_theme.get()
-            return self.PALETTES.get(theme, self.PALETTES["dark"])
+        def _get_design_tokens(self):
+            """Get design tokens for current theme."""
+            return _get_design_tokens(self.current_theme.get())
 
         def _apply_theme(self):
             """Apply theme to all widgets - called on init and theme change."""
-            palette = self._get_palette()
+            self.tokens = _get_design_tokens(self.current_theme.get())
+            self.spacing = self.tokens["spacing"]
+            colors = self.tokens["color"]
             style = ttk.Style(self.root)
-            
+
             try:
                 style.theme_use("clam")
             except self.tk.TclError:
                 pass
-                
+
             # Configure root
-            self.root.configure(background=palette["app"])
-            
+            self.root.configure(background=colors["bg_primary"])
+
             # Configure ttk styles
-            self._configure_ttk_styles(style, palette)
-            
+            self._configure_ttk_styles(style, colors)
+
             # Configure tk widgets that need manual updates
-            self._configure_tk_widgets(palette)
-            
-        def _configure_ttk_styles(self, style, palette):
+            self._configure_tk_widgets(colors)
+
+        def _configure_ttk_styles(self, style, colors):
             """Configure all ttk styles for current theme."""
             # Base styles
-            style.configure(".", 
-                          background=palette["app"], 
-                          foreground=palette["text"],
-                          font=(self.sans_font, 10))
-                          
-            # Frames
-            style.configure("TFrame", background=palette["app"])
-            style.configure("Card.TFrame", 
-                          background=palette["card"], 
-                          borderwidth=1, 
-                          relief="solid",
-                          bordercolor=palette["border"])
-            style.configure("Plain.TFrame", 
-                          background=palette["card"], 
-                          borderwidth=0, 
-                          relief="flat")
+            style.configure(
+                ".",
+                background=colors["bg_primary"],
+                foreground=colors["text_primary"],
+                font=self.fUI,
+            )
+
+            # Frames - Elevated card system
+            style.configure("TFrame", background=colors["bg_primary"])
+            style.configure(
+                "Card.TFrame",  # Elevation 1 - default card
+                background=colors["bg_secondary"],
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_default"],
+            )
+            style.configure(
+                "CardElevated.TFrame",  # Elevation 2 - raised card
+                background=colors["bg_tertiary"],
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_emphasis"],
+            )
+            style.configure(
+                "CardModal.TFrame",  # Elevation 3 - modal/dropdown
+                background=colors["bg_tertiary"],
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_emphasis"],
+            )
+            style.configure(
+                "Plain.TFrame",
+                background=colors["bg_secondary"],
+                borderwidth=0,
+                relief="flat",
+            )
             # Surface.TFrame - alias for Plain.TFrame for any legacy references
-            style.configure("Surface.TFrame", 
-                          background=palette["card"], 
-                          borderwidth=0, 
-                          relief="flat")
-                          
+            style.configure(
+                "Surface.TFrame",
+                background=colors["bg_secondary"],
+                borderwidth=0,
+                relief="flat",
+            )
+
             # Labels
-            style.configure("TLabel", 
-                          background=palette["app"], 
-                          foreground=palette["text"],
-                          font=self.fUI,
-                          padding=(0, 4))
-            style.configure("Secondary.TLabel", 
-                          background=palette["app"], 
-                          foreground=palette["text2"],
-                          font=self.fUI,
-                          padding=(0, 4))
-            style.configure("Muted.TLabel",
-                          background=palette["app"], 
-                          foreground=palette["text2"],
-                          font=self.fUI,
-                          padding=(0, 4))
-            style.configure("Card.TLabel",
-                          background=palette["card"],
-                          foreground=palette["text"],
-                          font=self.fSmall,
-                          padding=(0, 4))
-            style.configure("Card.Muted.TLabel",
-                          background=palette["card"],
-                          foreground=palette["text2"],
-                          font=self.fSmall,
-                          padding=(0, 4))
+            style.configure(
+                "TLabel",
+                background=colors["bg_primary"],
+                foreground=colors["text_primary"],
+                font=self.fUI,
+                padding=(0, 4),
+            )
+            style.configure(
+                "Secondary.TLabel",
+                background=colors["bg_primary"],
+                foreground=colors["text_secondary"],
+                font=self.fUI,
+                padding=(0, 4),
+            )
+            style.configure(
+                "Muted.TLabel",
+                background=colors["bg_primary"],
+                foreground=colors["text_muted"],
+                font=self.fUI,
+                padding=(0, 4),
+            )
+            style.configure(
+                "Card.TLabel",
+                background=colors["bg_secondary"],
+                foreground=colors["text_primary"],
+                font=self.fSmall,
+                padding=(0, 4),
+            )
+            style.configure(
+                "Card.Muted.TLabel",
+                background=colors["bg_secondary"],
+                foreground=colors["text_muted"],
+                font=self.fSmall,
+                padding=(0, 4),
+            )
 
             # LabelFrames
-            style.configure("TLabelframe", 
-                          background=palette["card"], 
-                          bordercolor=palette["border"],
-                          borderwidth=0,
-                          relief="flat")
-            style.configure("TLabelframe.Label", 
-                          background=palette["card"], 
-                          foreground=palette["accent"],
-                          font=self.fUIBold)
-            
+            style.configure(
+                "TLabelframe",
+                background=colors["bg_secondary"],
+                bordercolor=colors["border_default"],
+                borderwidth=0,
+                relief="flat",
+            )
+            style.configure(
+                "TLabelframe.Label",
+                background=colors["bg_secondary"],
+                foreground=colors["accent_primary"],
+                font=self.fUIBold,
+            )
+
             # Buttons - padding (16,6) for consistent height
-            style.configure("TButton",
-                          background=palette["input"],
-                          foreground=palette["text"],
-                          borderwidth=1,
-                          relief="solid",
-                          bordercolor=palette["border"],
-                          focuscolor=palette["accent"],
-                          padding=(16, 6),
-                          font=self.fUI)
-            style.map("TButton",
-                    background=[("active", palette["accent_hover"]), 
-                              ("pressed", palette["accent"]),
-                              ("disabled", palette["input"])],
-                    foreground=[("disabled", palette["text2"])])
-            
-            style.configure("Accent.TButton",
-                          background=palette["accent"],
-                          foreground=palette["accent_text"],
-                          borderwidth=1,
-                          relief="solid",
-                          focuscolor=palette["accent"],
-                          padding=(16, 6),
-                          font=self.fUIBold)
-            style.map("Accent.TButton",
-                    background=[("active", palette["accent_hover"]), 
-                              ("pressed", palette["accent"])],
-                    foreground=[("pressed", palette["accent_text"])])
-            
-            style.configure("Ghost.TButton",
-                          background=palette["card"],
-                          foreground=palette["text"],
-                          borderwidth=1,
-                          relief="solid",
-                          bordercolor=palette["border"],
-                          padding=(16, 6),
-                          font=self.fUI)
-            style.map("Ghost.TButton",
-                    background=[("active", palette["input"]), 
-                              ("pressed", palette["accent_hover"])],
-                    foreground=[("active", palette["text"]),
-                              ("pressed", palette["accent_text"])])
-            
+            style.configure(
+                "TButton",
+                background=colors["bg_secondary"],
+                foreground=colors["text_primary"],
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_default"],
+                focuscolor=colors["accent_primary"],
+                padding=(16, 6),
+                font=self.fUI,
+            )
+            style.map(
+                "TButton",
+                background=[
+                    ("active", colors["bg_hover"]),
+                    ("pressed", colors["accent_primary"]),
+                    ("disabled", colors["bg_secondary"]),
+                ],
+                foreground=[("disabled", colors["text_muted"])],
+            )
+
+            style.configure(
+                "Accent.TButton",
+                background=colors["accent_primary"],
+                foreground=colors["accent_text"],
+                borderwidth=1,
+                relief="solid",
+                focuscolor=colors["accent_primary"],
+                padding=(16, 6),
+                font=self.fUIBold,
+            )
+            style.map(
+                "Accent.TButton",
+                background=[
+                    ("active", colors["accent_hover"]),
+                    ("pressed", colors["accent_primary"]),
+                ],
+                foreground=[("pressed", colors["accent_text"])],
+            )
+
+            style.configure(
+                "Ghost.TButton",
+                background=colors["bg_secondary"],
+                foreground=colors["text_primary"],
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_default"],
+                padding=(16, 6),
+                font=self.fUI,
+            )
+            style.map(
+                "Ghost.TButton",
+                background=[
+                    ("active", colors["bg_hover"]),
+                    ("pressed", colors["accent_hover"]),
+                ],
+                foreground=[
+                    ("active", colors["text_primary"]),
+                    ("pressed", colors["accent_text"]),
+                ],
+            )
+
             # Entries - padding (8,6)
-            style.configure("TEntry",
-                          fieldbackground=palette["input"],
-                          foreground=palette["text"],
-                          borderwidth=1,
-                          relief="solid",
-                          bordercolor=palette["border"],
-                          insertcolor=palette["text"],
-                          padding=(8, 6),
-                          font=self.fUI)
-            style.map("TEntry",
-                    bordercolor=[("focus", palette["accent"])],
-                    fieldbackground=[("focus", palette["input"])])
-            
+            style.configure(
+                "TEntry",
+                fieldbackground=colors["bg_secondary"],
+                foreground=colors["text_primary"],
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_default"],
+                insertcolor=colors["text_primary"],
+                padding=(8, 6),
+                font=self.fUI,
+            )
+            style.map(
+                "TEntry",
+                bordercolor=[("focus", colors["accent_primary"])],
+                fieldbackground=[("focus", colors["bg_secondary"])],
+            )
+
             # Combobox - padding (8,6), dropdown font set via root.option_add
-            style.configure("TCombobox",
-                          fieldbackground=palette["input"],
-                          foreground=palette["text"],
-                          borderwidth=1,
-                          relief="solid",
-                          bordercolor=palette["border"],
-                          arrowcolor=palette["text2"],
-                          padding=(8, 6),
-                          font=self.fUI)
-            style.map("TCombobox",
-                    bordercolor=[("focus", palette["accent"])])
-                    
+            style.configure(
+                "TCombobox",
+                fieldbackground=colors["bg_secondary"],
+                foreground=colors["text_primary"],
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_default"],
+                arrowcolor=colors["text_secondary"],
+                padding=(8, 6),
+                font=self.fUI,
+            )
+            style.map("TCombobox", bordercolor=[("focus", colors["accent_primary"])])
+
             # Checkbuttons
-            style.configure("TCheckbutton",
-              background=palette["app"],
-              foreground=palette["text"],
-              indicatorcolor=palette["input"],
-              indicatorbordercolor=palette["border"])
-            style.map("TCheckbutton",
-                    background=[("active", palette["app"])],
-                    foreground=[("active", palette["text"])],
-                    indicatorcolor=[("selected", palette["accent"]), 
-                      ("!selected", palette["input"])],
-                    indicatorbordercolor=[("selected", palette["accent"]),
-                            ("focus", palette["accent"])])
-            style.configure("Card.TCheckbutton",
-              background=palette["card"],
-                          foreground=palette["text"],
-                          indicatorcolor=palette["input"],
-                          indicatorbordercolor=palette["border"])
-            style.map("Card.TCheckbutton",
-                    background=[("active", palette["card"])],
-                    foreground=[("active", palette["text"])],
-                    indicatorcolor=[("selected", palette["accent"]), 
-                                  ("!selected", palette["input"])],
-                    indicatorbordercolor=[("selected", palette["accent"]),
-                                        ("focus", palette["accent"])])
-            
+            style.configure(
+                "TCheckbutton",
+                background=colors["bg_primary"],
+                foreground=colors["text_primary"],
+                indicatorcolor=colors["bg_secondary"],
+                indicatorbordercolor=colors["border_default"],
+            )
+            style.map(
+                "TCheckbutton",
+                background=[("active", colors["bg_primary"])],
+                foreground=[("active", colors["text_primary"])],
+                indicatorcolor=[
+                    ("selected", colors["accent_primary"]),
+                    ("!selected", colors["bg_secondary"]),
+                ],
+                indicatorbordercolor=[
+                    ("selected", colors["accent_primary"]),
+                    ("focus", colors["accent_primary"]),
+                ],
+            )
+            style.configure(
+                "Card.TCheckbutton",
+                background=colors["bg_secondary"],
+                foreground=colors["text_primary"],
+                indicatorcolor=colors["bg_secondary"],
+                indicatorbordercolor=colors["border_default"],
+            )
+            style.map(
+                "Card.TCheckbutton",
+                background=[("active", colors["bg_secondary"])],
+                foreground=[("active", colors["text_primary"])],
+                indicatorcolor=[
+                    ("selected", colors["accent_primary"]),
+                    ("!selected", colors["bg_secondary"]),
+                ],
+                indicatorbordercolor=[
+                    ("selected", colors["accent_primary"]),
+                    ("focus", colors["accent_primary"]),
+                ],
+            )
+
             # Action checkboxes - centered in column
-            style.configure("Action.TCheckbutton",
-                          background=palette["card"],
-                          foreground=palette["text"],
-                          indicatorcolor=palette["input"],
-                          indicatorbordercolor=palette["border"],
-                          padding=[12, 4])
-            style.map("Action.TCheckbutton",
-                    background=[("active", palette["card"])],
-                    foreground=[("active", palette["text"])],
-                    indicatorcolor=[("selected", palette["accent"]), 
-                                  ("!selected", palette["input"])],
-                    indicatorbordercolor=[("selected", palette["accent"]),
-                                        ("focus", palette["accent"])])
-                                        
+            style.configure(
+                "Action.TCheckbutton",
+                background=colors["bg_secondary"],
+                foreground=colors["text_primary"],
+                indicatorcolor=colors["bg_secondary"],
+                indicatorbordercolor=colors["border_default"],
+                padding=[12, 4],
+            )
+            style.map(
+                "Action.TCheckbutton",
+                background=[("active", colors["bg_secondary"])],
+                foreground=[("active", colors["text_primary"])],
+                indicatorcolor=[
+                    ("selected", colors["accent_primary"]),
+                    ("!selected", colors["bg_secondary"]),
+                ],
+                indicatorbordercolor=[
+                    ("selected", colors["accent_primary"]),
+                    ("focus", colors["accent_primary"]),
+                ],
+            )
+
             # Notebook (tabs)
-            style.configure("TNotebook", 
-                          background=palette["app"],
-                          borderwidth=0)
-            style.configure("TNotebook.Tab",
-                          background=palette["card"],
-                          foreground=palette["text2"],
-                          borderwidth=1,
-                          relief="solid",
-                          bordercolor=palette["border"],
-                          padding=[20, 10])
-            style.map("TNotebook.Tab",
-                    background=[("selected", palette["card"] if self.current_theme.get() == "dark" else palette["card"]),
-                              ("active", palette["input"])],
-                    foreground=[("selected", palette["accent"]), 
-                              ("active", palette["text"])],
-                    bordercolor=[("selected", palette["accent"])],
-                    padding=[("selected", [25, 12])])
-                                  
+            style.configure("TNotebook", background=colors["bg_primary"], borderwidth=0)
+            style.configure(
+                "TNotebook.Tab",
+                background=colors["bg_secondary"],
+                foreground=colors["text_secondary"],
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_default"],
+                padding=[20, 10],
+            )
+            style.map(
+                "TNotebook.Tab",
+                background=[
+                    ("selected", colors["bg_secondary"]),
+                    ("active", colors["bg_hover"]),
+                ],
+                foreground=[
+                    ("selected", colors["accent_primary"]),
+                    ("active", colors["text_primary"]),
+                ],
+                bordercolor=[("selected", colors["accent_primary"])],
+                padding=[("selected", [25, 12])],
+            )
+
             # Treeview
-            style.configure("Treeview",
-                          background=palette["card"],
-                          fieldbackground=palette["card"],
-                          foreground=palette["text"],
-                          borderwidth=0,
-                          rowheight=28)
-            style.configure("Treeview.Heading",
-                          background=palette["input"],
-                          foreground=palette["accent"],
-                          font=(self.sans_font, 9, "bold"),
-                          borderwidth=1,
-                          relief="solid",
-                          bordercolor=palette["border"])
-            style.map("Treeview.Heading",
-                    background=[("active", palette["accent_hover"])])
-            style.map("Treeview",
-                    background=[("selected", palette["select"]), 
-                              ("focus", palette["select"])],
-                    foreground=[("selected", palette["accent_text"]), 
-                              ("focus", palette["accent_text"])])
-                              
+            style.configure(
+                "Treeview",
+                background=colors["bg_secondary"],
+                fieldbackground=colors["bg_secondary"],
+                foreground=colors["text_primary"],
+                borderwidth=0,
+                rowheight=32,
+            )
+            style.configure(
+                "Treeview.Heading",
+                background=colors["bg_secondary"],
+                foreground=colors["accent_primary"],
+                font=self.fSmallBold,
+                borderwidth=1,
+                relief="solid",
+                bordercolor=colors["border_default"],
+            )
+            style.map("Treeview.Heading", background=[("active", colors["bg_hover"])])
+            style.map(
+                "Treeview",
+                background=[
+                    ("selected", colors["select_bg"]),
+                    ("focus", colors["select_bg"]),
+                ],
+                foreground=[
+                    ("selected", colors["select_text"]),
+                    ("focus", colors["select_text"]),
+                ],
+            )
+
             # Scrollbars
-            style.configure("Vertical.TScrollbar",
-                          background=palette["input"],
-                          troughcolor=palette["app"],
-                          bordercolor=palette["border"],
-                          arrowcolor=palette["text2"],
-                          width=8)
-            style.map("Vertical.TScrollbar",
-                    background=[("active", palette["accent_hover"]), 
-                              ("pressed", palette["accent"])])
-                              
-            style.configure("Horizontal.TScrollbar",
-                          background=palette["input"],
-                          troughcolor=palette["app"],
-                          bordercolor=palette["border"],
-                          arrowcolor=palette["text2"],
-                          height=8)
-            style.map("Horizontal.TScrollbar",
-                    background=[("active", palette["accent_hover"]), 
-                              ("pressed", palette["accent"])])
-                              
+            style.configure(
+                "Vertical.TScrollbar",
+                background=colors["bg_secondary"],
+                troughcolor=colors["bg_primary"],
+                bordercolor=colors["border_default"],
+                arrowcolor=colors["text_secondary"],
+                width=8,
+            )
+            style.map(
+                "Vertical.TScrollbar",
+                background=[
+                    ("active", colors["accent_hover"]),
+                    ("pressed", colors["accent_primary"]),
+                ],
+            )
+
+            style.configure(
+                "Horizontal.TScrollbar",
+                background=colors["bg_secondary"],
+                troughcolor=colors["bg_primary"],
+                bordercolor=colors["border_default"],
+                arrowcolor=colors["text_secondary"],
+                height=8,
+            )
+            style.map(
+                "Horizontal.TScrollbar",
+                background=[
+                    ("active", colors["accent_hover"]),
+                    ("pressed", colors["accent_primary"]),
+                ],
+            )
+
             # Progressbar
-            style.configure("TProgressbar",
-                          background=palette["accent"],
-                          troughcolor=palette["input"],
-                          borderwidth=0,
-                          thickness=4)
-                          
+            style.configure(
+                "TProgressbar",
+                background=colors["accent_primary"],
+                troughcolor=colors["bg_secondary"],
+                borderwidth=0,
+                thickness=4,
+            )
+
             # Separator
-            style.configure("TSeparator", background=palette["border"])
-            
-        def _configure_tk_widgets(self, palette):
+            style.configure("TSeparator", background=colors["border_default"])
+
+        def _configure_tk_widgets(self, colors):
             """Configure tk widgets (Canvas, ScrolledText) that need manual updates."""
             # Update canvas backgrounds
             if self.weights_canvas:
-                self.weights_canvas.configure(background=palette["card"], highlightthickness=0)
+                self.weights_canvas.configure(
+                    background=colors["bg_secondary"], highlightthickness=0
+                )
             if self.users_canvas:
-                self.users_canvas.configure(background=palette["card"], highlightthickness=0)
-                
+                self.users_canvas.configure(
+                    background=colors["bg_secondary"], highlightthickness=0
+                )
+
             # Update ScrolledText widgets
             if self.result_text:
                 self.result_text.configure(
-                    background=palette["card"],
-                    foreground=palette["text"],
-                    insertbackground=palette["accent"],
-                    selectbackground=palette["select"],
-                    selectforeground=palette["accent_text"],
+                    background=colors["bg_secondary"],
+                    foreground=colors["text_primary"],
+                    insertbackground=colors["accent_primary"],
+                    selectbackground=colors["select_bg"],
+                    selectforeground=colors["select_text"],
                     borderwidth=0,
                     highlightthickness=0,
-                    font=self.fMono
+                    font=self.fMono,
                 )
-            
+
             # Update info tab text widgets
-            for text_widget in getattr(self, 'info_text_widgets', []):
+            for text_widget in getattr(self, "info_text_widgets", []):
                 text_widget.configure(
-                    background=palette["card"],
-                    foreground=palette["text"],
-                    insertbackground=palette["accent"],
-                    selectbackground=palette["select"],
-                    selectforeground=palette["accent_text"],
+                    background=colors["bg_secondary"],
+                    foreground=colors["text_primary"],
+                    insertbackground=colors["accent_primary"],
+                    selectbackground=colors["select_bg"],
+                    selectforeground=colors["select_text"],
                     borderwidth=0,
                     highlightthickness=0,
-                    font=self.fMono
+                    font=self.fMono,
                 )
-                
+
             # Update treeview tags for existing trees
             for tree in [self.ranking_tree, self.details_tree]:
                 if tree:
-                    tree.tag_configure("oddrow", background=palette["card"])
-                    tree.tag_configure("evenrow", background=palette["zebra"])
+                    tree.tag_configure("oddrow", background=colors["bg_secondary"])
+                    tree.tag_configure("evenrow", background=colors["zebra_subtle"])
+
+        def _create_theme_toggle(self, parent):
+            """Create a compact theme toggle button."""
+            colors = self.tokens["color"]
+
+            # Use a styled button that shows current theme
+            btn = ttk.Button(
+                parent,
+                text="🌙 Dark" if self.current_theme.get() == "dark" else "☀️ Light",
+                style="Ghost.TButton",
+                command=lambda: self._toggle_theme(btn),
+            )
+            return btn
+
+        def _toggle_theme(self, btn):
+            """Toggle theme and update button text."""
+            new_theme = "dark" if self.current_theme.get() == "light" else "light"
+            self.current_theme.set(new_theme)
+            btn.configure(text="🌙 Dark" if new_theme == "dark" else "☀️ Light")
+            self._apply_theme()
 
         def _setup_layout(self):
             """Set up the complete GUI layout according to specification."""
-            # Main container with padding
+            # Main container with padding - using spacing tokens
             main_frame = ttk.Frame(self.root)
-            main_frame.grid(row=0, column=0, sticky="nsew", padx=16, pady=16)
+            main_frame.grid(
+                row=0,
+                column=0,
+                sticky="nsew",
+                padx=self.spacing["lg"],
+                pady=self.spacing["lg"],
+            )
             main_frame.columnconfigure(0, weight=1)
             main_frame.rowconfigure(2, weight=1)  # Results row expands
-            
+
             # Helper to compute minsize for a column based on font
             def measure_text(text, font_tuple):
                 import tkinter.font as tkfont
+
                 f = tkfont.Font(font=font_tuple)
-                return f.measure(text) + 16  # 16px padding
-            
+                return f.measure(text) + self.spacing["md"]  # 16px padding
+
             # Pre-compute column minsizes for weights panel (shared by header and data rows)
-            palette = self._get_palette()
             # We'll use fSmall for header labels, fUI for data
             # We compute minsizes dynamically when data is loaded, but set a minimum base
-            self._weights_col0_minsize = 48   # checkbox column
+            self._weights_col0_minsize = 48  # checkbox column
             self._weights_col1_minsize = measure_text("Action", self.fSmall)
             self._weights_col2_minsize = measure_text("Weight", self.fSmall)
-            
-            # File selection frame (Input card) - OUTER CARD
-            file_frame = ttk.Frame(main_frame, style="Card.TFrame")
-            file_frame.grid(row=0, column=0, sticky="ew", pady=(0, 16))
+
+            # File selection frame (Input card) - OUTER CARD (Elevated)
+            file_frame = ttk.Frame(main_frame, style="CardElevated.TFrame")
+            file_frame.grid(row=0, column=0, sticky="ew", pady=(0, self.spacing["lg"]))
             file_frame.columnconfigure(1, weight=1)
-            
+
             # Row 0: CSV selection
-            ttk.Label(file_frame, text="Action log CSV", style="Card.TLabel").grid(row=0, column=0, sticky="w", padx=(12, 12), pady=(12, 4))
+            ttk.Label(file_frame, text="Action log CSV", style="Card.TLabel").grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=(self.spacing["md"], self.spacing["md"]),
+                pady=(self.spacing["md"], self.spacing["xs"]),
+            )
             csv_entry = ttk.Entry(file_frame, textvariable=self.csv_path_var)
-            csv_entry.grid(row=0, column=1, sticky="ew", padx=(12, 12), pady=(12, 4))
-            ttk.Button(file_frame, text="Browse...", command=self.browse_csv, style="Ghost.TButton").grid(row=0, column=2, sticky="w", padx=(12, 12), pady=(12, 4))
-            
+            csv_entry.grid(
+                row=0,
+                column=1,
+                sticky="ew",
+                padx=(self.spacing["md"], self.spacing["md"]),
+                pady=(self.spacing["md"], self.spacing["xs"]),
+            )
+            ttk.Button(
+                file_frame,
+                text="Browse...",
+                command=self.browse_csv,
+                style="Ghost.TButton",
+            ).grid(
+                row=0,
+                column=2,
+                sticky="w",
+                padx=(self.spacing["md"], self.spacing["md"]),
+                pady=(self.spacing["md"], self.spacing["xs"]),
+            )
+
             # Row 1: Threshold and theme - INNER FRAME (Plain.TFrame)
             threshold_frame = ttk.Frame(file_frame, style="Plain.TFrame")
-            threshold_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(4, 12))
+            threshold_frame.grid(
+                row=1,
+                column=0,
+                columnspan=3,
+                sticky="ew",
+                padx=(
+                    self.spacing["md"],
+                    self.spacing["md"],
+                ),  # Keep inside card borders
+                pady=(self.spacing["xs"], self.spacing["md"]),
+            )
             threshold_frame.columnconfigure(0, weight=1)  # Allow label column to expand
             threshold_frame.columnconfigure(1, weight=0)
             threshold_frame.columnconfigure(2, weight=0)
             threshold_frame.columnconfigure(3, weight=0)
-            
-            ttk.Label(threshold_frame, text="Skip threshold minutes", style="Card.Muted.TLabel").grid(row=0, column=0, sticky="e", padx=(12, 12))
-            ttk.Entry(threshold_frame, textvariable=self.threshold_var, width=8).grid(row=0, column=1, sticky="w", padx=(0, 24))
-            
-            ttk.Label(threshold_frame, text="Theme", style="Card.Muted.TLabel").grid(row=0, column=2, sticky="w", padx=(12, 0))
-            theme_combo = ttk.Combobox(threshold_frame, textvariable=self.current_theme, values=["dark", "light"], state="readonly", width=8)
-            theme_combo.grid(row=0, column=3, sticky="w", padx=(0, 12))
-            theme_combo.bind("<<ComboboxSelected>>", lambda e: self._apply_theme())
-            
-            # Options frame with two equal cards
+
+            ttk.Label(
+                threshold_frame,
+                text="Skip threshold minutes",
+                style="Card.Muted.TLabel",
+            ).grid(
+                row=0,
+                column=0,
+                sticky="e",
+                padx=(self.spacing["md"], self.spacing["md"]),
+            )
+            ttk.Entry(threshold_frame, textvariable=self.threshold_var, width=8).grid(
+                row=0, column=1, sticky="w", padx=(0, self.spacing["lg"])
+            )
+
+            # Theme toggle switch (replaces combobox)
+            ttk.Label(threshold_frame, text="Theme", style="Card.Muted.TLabel").grid(
+                row=0, column=2, sticky="w", padx=(self.spacing["md"], 0)
+            )
+            self._create_theme_toggle(threshold_frame).grid(
+                row=0, column=3, sticky="w", padx=(0, self.spacing["md"])
+            )
+
+            # Options frame with two equal cards - using elevated cards
             options_frame = ttk.Frame(main_frame)
             options_frame.grid(row=1, column=0, sticky="ew", pady=(0, 16))
             options_frame.columnconfigure(0, weight=1, uniform="option_panels")
             options_frame.columnconfigure(1, weight=1, uniform="option_panels")
-            
+
             # Action Weights card - OUTER CARD
             weights_card = ttk.Frame(options_frame, style="Card.TFrame")
             weights_card.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
             weights_card.columnconfigure(0, weight=1)
             weights_card.rowconfigure(1, weight=1)
-            
+
             # Weights header - INNER FRAME (Plain.TFrame)
             weights_header = ttk.Frame(weights_card, style="Plain.TFrame")
             weights_header.grid(row=0, column=0, sticky="ew", pady=(16, 8), padx=16)
             weights_header.columnconfigure(0, minsize=self._weights_col0_minsize)
-            weights_header.columnconfigure(1, weight=1, minsize=self._weights_col1_minsize)
+            weights_header.columnconfigure(
+                1, weight=1, minsize=self._weights_col1_minsize
+            )
             weights_header.columnconfigure(2, minsize=self._weights_col2_minsize)
-            
-            ttk.Label(weights_header, text="Use", style="Card.Muted.TLabel").grid(row=0, column=0, sticky="w", padx=(12, 0))
-            ttk.Label(weights_header, text="Action", style="Card.TLabel").grid(row=0, column=1, sticky="w", padx=(12, 12))
-            ttk.Label(weights_header, text="Weight", style="Card.Muted.TLabel").grid(row=0, column=2, sticky="w", padx=(0, 12))
-            
+
+            ttk.Label(weights_header, text="Use", style="Card.Muted.TLabel").grid(
+                row=0, column=0, sticky="w", padx=(12, 0)
+            )
+            ttk.Label(weights_header, text="Action", style="Card.TLabel").grid(
+                row=0, column=1, sticky="w", padx=(12, 12)
+            )
+            ttk.Label(weights_header, text="Weight", style="Card.Muted.TLabel").grid(
+                row=0, column=2, sticky="w", padx=(0, 12)
+            )
+
             # Weights canvas frame - INNER FRAME (Plain.TFrame)
             weights_canvas_frame = ttk.Frame(weights_card, style="Plain.TFrame")
-            weights_canvas_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 16))
+            weights_canvas_frame.grid(
+                row=1,
+                column=0,
+                sticky="nsew",
+                padx=self.spacing["lg"],
+                pady=(0, self.spacing["lg"]),
+            )
             weights_canvas_frame.columnconfigure(0, weight=1)
             weights_canvas_frame.rowconfigure(0, weight=1)
-            
-            palette = self._get_palette()
-            self.weights_canvas = tk.Canvas(weights_canvas_frame, highlightthickness=0, background=palette["card"])
-            self.weights_scrollbar = ttk.Scrollbar(weights_canvas_frame, orient="vertical", command=self.weights_canvas.yview)
+
+            colors = self.tokens["color"]
+            self.weights_canvas = tk.Canvas(
+                weights_canvas_frame,
+                highlightthickness=0,
+                background=colors["bg_secondary"],
+            )
+            self.weights_scrollbar = ttk.Scrollbar(
+                weights_canvas_frame,
+                orient="vertical",
+                command=self.weights_canvas.yview,
+            )
             self.weights_frame = ttk.Frame(self.weights_canvas, style="Plain.TFrame")
-            self.weights_window = self.weights_canvas.create_window((0, 0), window=self.weights_frame, anchor="nw")
+            self.weights_window = self.weights_canvas.create_window(
+                (0, 0), window=self.weights_frame, anchor="nw"
+            )
             self.weights_canvas.configure(yscrollcommand=self.weights_scrollbar.set)
-            
+
             self.weights_canvas.grid(row=0, column=0, sticky="nsew")
             self.weights_scrollbar.grid(row=0, column=1, sticky="ns")
-            
+
             self.weights_frame.bind("<Configure>", self._sync_weights_scroll)
             self.weights_canvas.bind("<Configure>", self._sync_weights_width)
-            
+
             # Apply column minsizes to data rows frame too
             self.weights_frame.columnconfigure(0, minsize=self._weights_col0_minsize)
-            self.weights_frame.columnconfigure(1, weight=1, minsize=self._weights_col1_minsize)
+            self.weights_frame.columnconfigure(
+                1, weight=1, minsize=self._weights_col1_minsize
+            )
             self.weights_frame.columnconfigure(2, minsize=self._weights_col2_minsize)
-            
+
             # Users card - OUTER CARD
             users_card = ttk.Frame(options_frame, style="Card.TFrame")
             users_card.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
             users_card.columnconfigure(0, weight=1)
             users_card.rowconfigure(1, weight=1)
-            
+
             # Users toolbar - INNER FRAME (Plain.TFrame)
             users_toolbar = ttk.Frame(users_card, style="Plain.TFrame")
             users_toolbar.grid(row=0, column=0, sticky="ew", pady=(16, 8), padx=16)
             users_toolbar.columnconfigure(0, weight=0)
             users_toolbar.columnconfigure(1, weight=0)
             users_toolbar.columnconfigure(2, weight=1)
-            
-            ttk.Button(users_toolbar, text="Select All", command=lambda: self.set_user_selection(True), style="Ghost.TButton").grid(row=0, column=0, sticky="ew", padx=(0, 8))
-            ttk.Button(users_toolbar, text="Clear", command=lambda: self.set_user_selection(False), style="Ghost.TButton").grid(row=0, column=1, sticky="ew", padx=(0, 8))
-            ttk.Label(users_toolbar, text="Included in calculations", style="Card.Muted.TLabel").grid(row=0, column=2, sticky="e")
-            
+
+            ttk.Button(
+                users_toolbar,
+                text="Select All",
+                command=lambda: self.set_user_selection(True),
+                style="Ghost.TButton",
+            ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+            ttk.Button(
+                users_toolbar,
+                text="Clear",
+                command=lambda: self.set_user_selection(False),
+                style="Ghost.TButton",
+            ).grid(row=0, column=1, sticky="ew", padx=(0, 8))
+            ttk.Label(
+                users_toolbar,
+                text="Included in calculations",
+                style="Card.Muted.TLabel",
+            ).grid(row=0, column=2, sticky="e")
+
             # Users canvas frame - INNER FRAME (Plain.TFrame)
             users_canvas_frame = ttk.Frame(users_card, style="Plain.TFrame")
-            users_canvas_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 16))
+            users_canvas_frame.grid(
+                row=1,
+                column=0,
+                sticky="nsew",
+                padx=self.spacing["lg"],
+                pady=(0, self.spacing["lg"]),
+            )
             users_canvas_frame.columnconfigure(0, weight=1)
             users_canvas_frame.rowconfigure(0, weight=1)
-            
-            self.users_canvas = tk.Canvas(users_canvas_frame, highlightthickness=0, background=palette["card"])
-            self.users_scrollbar = ttk.Scrollbar(users_canvas_frame, orient="vertical", command=self.users_canvas.yview)
+
+            colors = self.tokens["color"]
+            self.users_canvas = tk.Canvas(
+                users_canvas_frame,
+                highlightthickness=0,
+                background=colors["bg_secondary"],
+            )
+            self.users_scrollbar = ttk.Scrollbar(
+                users_canvas_frame, orient="vertical", command=self.users_canvas.yview
+            )
             self.users_frame = ttk.Frame(self.users_canvas, style="Plain.TFrame")
-            self.users_window = self.users_canvas.create_window((0, 0), window=self.users_frame, anchor="nw")
+            self.users_window = self.users_canvas.create_window(
+                (0, 0), window=self.users_frame, anchor="nw"
+            )
             self.users_canvas.configure(yscrollcommand=self.users_scrollbar.set)
-            
+
             self.users_canvas.grid(row=0, column=0, sticky="nsew")
             self.users_scrollbar.grid(row=0, column=1, sticky="ns")
-            
+
             self.users_frame.bind("<Configure>", self._sync_users_scroll)
             self.users_canvas.bind("<Configure>", self._sync_users_width)
-            
+
             # Make users_frame expand to fill canvas (no grey areas)
             self.users_frame.columnconfigure(0, weight=1)
-            
+
             # Results card - OUTER CARD
             results_card = ttk.Frame(main_frame, style="Card.TFrame")
             results_card.grid(row=2, column=0, sticky="nsew", pady=(0, 16))
             results_card.columnconfigure(0, weight=1)
             results_card.rowconfigure(0, weight=1)
-            
+
             # Notebook for tabs
             self.result_tabs = ttk.Notebook(results_card)
             self.result_tabs.grid(row=0, column=0, sticky="nsew", padx=16, pady=16)
-            
+
             # Compute sort combobox width from longest option
             sort_labels = [label for _key, label, _default_desc in RANKING_SORT_OPTIONS]
             max_label_len = max(len(label) for label in sort_labels)
             sort_combo_width = max_label_len + 2
-            
+
             # Ranking tab - Plain.TFrame (tabs are inner to notebook)
             ranking_tab = ttk.Frame(self.result_tabs, style="Plain.TFrame")
             ranking_tab.columnconfigure(0, weight=1)
             ranking_tab.rowconfigure(1, weight=1)
-            
+
             # Ranking controls - INNER FRAME (Plain.TFrame)
             ranking_controls = ttk.Frame(ranking_tab, style="Plain.TFrame")
             ranking_controls.grid(row=0, column=0, sticky="ew", pady=(0, 8))
@@ -1241,24 +1828,37 @@ def run_gui():
             ranking_controls.columnconfigure(1, weight=0)
             ranking_controls.columnconfigure(2, weight=0)
             ranking_controls.columnconfigure(3, weight=1)
-            
-            ttk.Label(ranking_controls, text="Sort by", style="Card.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 8))
-            sort_combo = ttk.Combobox(ranking_controls, textvariable=self.ranking_sort_var,
-                                    values=sort_labels,
-                                    state="readonly", width=sort_combo_width)
+
+            ttk.Label(ranking_controls, text="Sort by", style="Card.TLabel").grid(
+                row=0, column=0, sticky="w", padx=(0, 8)
+            )
+            sort_combo = ttk.Combobox(
+                ranking_controls,
+                textvariable=self.ranking_sort_var,
+                values=sort_labels,
+                state="readonly",
+                width=sort_combo_width,
+            )
             sort_combo.grid(row=0, column=1, sticky="ew", padx=(0, 8))
             sort_combo.bind("<<ComboboxSelected>>", self._on_ranking_sort_changed)
-            
-            ttk.Checkbutton(ranking_controls, text="Descending", variable=self.ranking_desc_var,
-                          command=self.apply_ranking_sort, style="Card.TCheckbutton").grid(row=0, column=2, sticky="w", padx=(0, 8))
-            ttk.Button(ranking_controls, text="Apply", command=self.apply_ranking_sort).grid(row=0, column=3, sticky="w")
-            
+
+            ttk.Checkbutton(
+                ranking_controls,
+                text="Descending",
+                variable=self.ranking_desc_var,
+                command=self.apply_ranking_sort,
+                style="Card.TCheckbutton",
+            ).grid(row=0, column=2, sticky="w", padx=(0, 8))
+            ttk.Button(
+                ranking_controls, text="Apply", command=self.apply_ranking_sort
+            ).grid(row=0, column=3, sticky="w")
+
             # Ranking treeview - inner wrapper (Card.TFrame with 8px padding per spec)
             tree_frame = ttk.Frame(ranking_tab, style="Card.TFrame")
             tree_frame.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
             tree_frame.columnconfigure(0, weight=1)
             tree_frame.rowconfigure(0, weight=1)
-            
+
             self.ranking_tree = self._create_tree_tab(
                 tree_frame,
                 (
@@ -1272,19 +1872,26 @@ def run_gui():
                     ("speed_delta", "Speed Delta", 110, "e"),
                     ("avg_duration", "Avg Duration", 110, "e"),
                     ("score", "Score", 90, "e"),
-                )
+                ),
             )
-            
-            y_scrollbar_ranking = ttk.Scrollbar(tree_frame, orient="vertical", command=self.ranking_tree.yview)
-            x_scrollbar_ranking = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.ranking_tree.xview)
-            self.ranking_tree.configure(yscrollcommand=y_scrollbar_ranking.set, xscrollcommand=x_scrollbar_ranking.set)
+
+            y_scrollbar_ranking = ttk.Scrollbar(
+                tree_frame, orient="vertical", command=self.ranking_tree.yview
+            )
+            x_scrollbar_ranking = ttk.Scrollbar(
+                tree_frame, orient="horizontal", command=self.ranking_tree.xview
+            )
+            self.ranking_tree.configure(
+                yscrollcommand=y_scrollbar_ranking.set,
+                xscrollcommand=x_scrollbar_ranking.set,
+            )
             self.ranking_tree.grid(row=0, column=0, sticky="nsew")
             y_scrollbar_ranking.grid(row=0, column=1, sticky="ns")
             x_scrollbar_ranking.grid(row=1, column=0, sticky="ew")
-            
+
             self.result_tabs.add(ranking_tab, text="Ranking")
-            
-                        # Details tab - Plain.TFrame (tabs are inner to notebook)
+
+            # Details tab - Plain.TFrame (tabs are inner to notebook)
             details_tab = ttk.Frame(self.result_tabs, style="Plain.TFrame")
             details_tab.columnconfigure(0, weight=1)
             details_tab.rowconfigure(0, weight=1)
@@ -1306,12 +1913,19 @@ def run_gui():
                     ("avg_duration", "Avg Duration", 110, "e"),
                     ("duration_delta", "Duration Delta", 120, "e"),
                     ("samples", "Samples", 90, "e"),
-                )
+                ),
             )
 
-            y_scrollbar_details = ttk.Scrollbar(tree_frame_details, orient="vertical", command=self.details_tree.yview)
-            x_scrollbar_details = ttk.Scrollbar(tree_frame_details, orient="horizontal", command=self.details_tree.xview)
-            self.details_tree.configure(yscrollcommand=y_scrollbar_details.set, xscrollcommand=x_scrollbar_details.set)
+            y_scrollbar_details = ttk.Scrollbar(
+                tree_frame_details, orient="vertical", command=self.details_tree.yview
+            )
+            x_scrollbar_details = ttk.Scrollbar(
+                tree_frame_details, orient="horizontal", command=self.details_tree.xview
+            )
+            self.details_tree.configure(
+                yscrollcommand=y_scrollbar_details.set,
+                xscrollcommand=x_scrollbar_details.set,
+            )
             self.details_tree.grid(row=0, column=0, sticky="nsew")
             y_scrollbar_details.grid(row=0, column=1, sticky="ns")
             x_scrollbar_details.grid(row=1, column=0, sticky="ew")
@@ -1328,7 +1942,7 @@ def run_gui():
                 wrap="word",
                 undo=True,
                 borderwidth=0,
-                highlightthickness=0
+                highlightthickness=0,
             )
             self.result_text.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
 
@@ -1336,90 +1950,112 @@ def run_gui():
 
             # Info tab
             self._create_info_tab(self.result_tabs)
-            
+
             # Bottom bar (not a card)
             bottom_frame = ttk.Frame(main_frame)
             bottom_frame.grid(row=3, column=0, sticky="ew", pady=(8, 0))
             bottom_frame.columnconfigure(2, weight=1)
-            
-            self.generate_btn = ttk.Button(bottom_frame, text="Generate Report", command=self.generate_report, style="Accent.TButton")
+
+            self.generate_btn = ttk.Button(
+                bottom_frame,
+                text="Generate Report",
+                command=self.generate_report,
+                style="Accent.TButton",
+            )
             self.generate_btn.grid(row=0, column=0, sticky="w", padx=(0, 12))
-            self.export_btn = ttk.Button(bottom_frame, text="Export MD", command=self.export_markdown, style="Ghost.TButton")
+            self.export_btn = ttk.Button(
+                bottom_frame,
+                text="Export MD",
+                command=self.export_markdown,
+                style="Ghost.TButton",
+            )
             self.export_btn.grid(row=0, column=1, sticky="w")
-            ttk.Label(bottom_frame, textvariable=self.status_var, style="Secondary.TLabel").grid(row=0, column=2, sticky="w")
-            
+            ttk.Label(
+                bottom_frame, textvariable=self.status_var, style="Secondary.TLabel"
+            ).grid(row=0, column=2, sticky="w")
+
         def _create_tree_tab(self, parent, columns):
             """Create a generic treeview."""
             from tkinter import ttk
-            
-            tree = ttk.Treeview(parent, columns=[column[0] for column in columns], show="headings")
-            
+
+            tree = ttk.Treeview(
+                parent, columns=[column[0] for column in columns], show="headings"
+            )
+
             for column_id, label, width, anchor in columns:
                 tree.heading(column_id, text=label)
-                tree.column(column_id, width=width, minwidth=60, anchor=anchor, stretch=True)
-                
+                tree.column(
+                    column_id, width=width, minwidth=60, anchor=anchor, stretch=True
+                )
+
             self._configure_tree_tags(tree)
-            
+
             return tree
-            
+
         def _create_info_tab(self, notebook):
             """Create info tab."""
             from tkinter import scrolledtext, ttk
-            
+
             info_tab = ttk.Frame(notebook, style="Plain.TFrame")
             info_tab.columnconfigure(0, weight=1)
             info_tab.rowconfigure(0, weight=1)
-            
+
             info_text = scrolledtext.ScrolledText(
-                info_tab,
-                wrap="word",
-                borderwidth=0,
-                highlightthickness=0
+                info_tab, wrap="word", borderwidth=0, highlightthickness=0
             )
             info_text.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
             info_text.insert("1.0", _build_gui_info_text())
             info_text.configure(state="disabled")
-            
+
             # Store reference for theme updates
-            if not hasattr(self, 'info_text_widgets'):
+            if not hasattr(self, "info_text_widgets"):
                 self.info_text_widgets = []
             self.info_text_widgets.append(info_text)
-            
+
             notebook.add(info_tab, text="Info")
-            
+
         def _configure_tree_tags(self, tree):
             """Configure treeview tags for alternating row colors."""
-            palette = self._get_palette()
-            tree.tag_configure("oddrow", background=palette["card"])
-            tree.tag_configure("evenrow", background=palette["zebra"])
-            
+            colors = self.tokens["color"]
+            tree.tag_configure("oddrow", background=colors["bg_secondary"])
+            tree.tag_configure("evenrow", background=colors["zebra_subtle"])
+            # Score badge tags
+            tree.tag_configure("score_excellent", foreground=colors["success"])
+            tree.tag_configure("score_good", foreground=colors["warning"])
+            tree.tag_configure("score_poor", foreground=colors["error"])
+            tree.tag_configure("score_neutral", foreground=colors["text_secondary"])
+            # Delta tags
+            tree.tag_configure("delta_positive", foreground=colors["success"])
+            tree.tag_configure("delta_negative", foreground=colors["error"])
+            tree.tag_configure("delta_neutral", foreground=colors["text_secondary"])
+
         def _sync_weights_scroll(self, _event=None):
             self.weights_canvas.configure(scrollregion=self.weights_canvas.bbox("all"))
-            
+
         def _sync_weights_width(self, event):
             self.weights_canvas.itemconfigure(self.weights_window, width=event.width)
-            
+
         def _sync_users_scroll(self, _event=None):
             self.users_canvas.configure(scrollregion=self.users_canvas.bbox("all"))
-            
+
         def _sync_users_width(self, event):
             self.users_canvas.itemconfigure(self.users_window, width=event.width)
-            
+
         def _populate_treeview(self, tree, data, columns):
             """Populate a treeview with data."""
             # Clear existing items
             for item in tree.get_children():
                 tree.delete(item)
-                
+
             # Insert data with alternating row colors
             for i, row in enumerate(data):
                 values = [row.get(col[0], "") for col in columns]
                 tag = "evenrow" if i % 2 == 0 else "oddrow"
                 tree.insert("", "end", values=values, tags=(tag,))
-                
+
         def browse_csv(self):
             from tkinter import filedialog
-            
+
             path = filedialog.askopenfilename(
                 title="Select user action log CSV",
                 filetypes=(("CSV files", "*.csv"), ("All files", "*.*")),
@@ -1429,7 +2065,7 @@ def run_gui():
             self.csv_path_var.set(path)
             self.status_var.set("Loading CSV...")
             self._set_busy(True)
-            
+
             def load_csv():
                 try:
                     actions, weights = discover_actions_for_gui(path)
@@ -1438,22 +2074,25 @@ def run_gui():
                     return result
                 except Exception as e:
                     raise
-            
+
             def on_done(result):
                 actions, weights, users = result
                 self.set_action_rows(actions, weights)
                 self.set_user_rows(users)
-                self.status_var.set(f"Loaded {len(actions)} actions and {len(users)} users from CSV/defaults.")
+                self.status_var.set(
+                    f"Loaded {len(actions)} actions and {len(users)} users from CSV/defaults."
+                )
                 self._set_busy(False)
-            
+
             def on_error(exc):
                 from tkinter import messagebox
+
                 messagebox.showerror("CSV error", str(exc))
                 self.status_var.set("Could not read selected CSV.")
                 self._set_busy(False)
-            
+
             self._run_in_background(load_csv, on_done, on_error)
-            
+
         def set_action_rows(self, actions, weights):
             from tkinter import ttk
 
@@ -1462,50 +2101,62 @@ def run_gui():
             self.action_rows = []
             # Use shared minsizes from layout
             self.weights_frame.columnconfigure(0, minsize=self._weights_col0_minsize)
-            self.weights_frame.columnconfigure(1, weight=1, minsize=self._weights_col1_minsize)
+            self.weights_frame.columnconfigure(
+                1, weight=1, minsize=self._weights_col1_minsize
+            )
             self.weights_frame.columnconfigure(2, minsize=self._weights_col2_minsize)
-            
+
             for row_idx, action in enumerate(actions):
                 enabled_var = self.tk.BooleanVar(value=True)
-                weight_var = self.tk.StringVar(value=f"{float(weights.get(action, 1.0)):g}")
+                weight_var = self.tk.StringVar(
+                    value=f"{float(weights.get(action, 1.0)):g}"
+                )
 
-                ttk.Checkbutton(self.weights_frame, variable=enabled_var, style="Action.TCheckbutton").grid(row=row_idx, column=0, pady=4)
-                ttk.Label(self.weights_frame, text=action).grid(row=row_idx, column=1, sticky="ew", padx=(8, 8), pady=4)
-                ttk.Entry(self.weights_frame, textvariable=weight_var, width=12).grid(row=row_idx, column=2, sticky="w", pady=4, padx=(0, 8))
+                ttk.Checkbutton(
+                    self.weights_frame,
+                    variable=enabled_var,
+                    style="Action.TCheckbutton",
+                ).grid(row=row_idx, column=0, pady=4)
+                ttk.Label(self.weights_frame, text=action).grid(
+                    row=row_idx, column=1, sticky="ew", padx=(8, 8), pady=4
+                )
+                ttk.Entry(self.weights_frame, textvariable=weight_var, width=12).grid(
+                    row=row_idx, column=2, sticky="w", pady=4, padx=(0, 8)
+                )
 
                 self.action_rows.append((action, enabled_var, weight_var))
-                
-        def set_user_rows(self, users):
-                    from tkinter import ttk
 
-                    for child in self.users_frame.winfo_children():
-                        child.destroy()
-                    self.user_rows = []
-                    self.users_frame.columnconfigure(0, weight=1)
-            
-                    if not users:
-                        ttk.Label(
-                            self.users_frame,
-                            text="Select a CSV to load users.",
-                            style="Card.Muted.TLabel",
-                            padding=(8, 8),
-                            anchor="center"
-                        ).grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-                        return
-            
-                    for row_idx, username in enumerate(users):
-                        enabled_var = self.tk.BooleanVar(value=True)
-                        ttk.Checkbutton(
-                            self.users_frame,
-                            text=username,
-                            variable=enabled_var,
-                        ).grid(row=row_idx, column=0, sticky="ew", pady=4, padx=8)
-                        self.user_rows.append((username, enabled_var))
-                
+        def set_user_rows(self, users):
+            from tkinter import ttk
+
+            for child in self.users_frame.winfo_children():
+                child.destroy()
+            self.user_rows = []
+            self.users_frame.columnconfigure(0, weight=1)
+
+            if not users:
+                ttk.Label(
+                    self.users_frame,
+                    text="Select a CSV to load users.",
+                    style="Card.Muted.TLabel",
+                    padding=(8, 8),
+                    anchor="center",
+                ).grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+                return
+
+            for row_idx, username in enumerate(users):
+                enabled_var = self.tk.BooleanVar(value=True)
+                ttk.Checkbutton(
+                    self.users_frame,
+                    text=username,
+                    variable=enabled_var,
+                ).grid(row=row_idx, column=0, sticky="ew", pady=4, padx=8)
+                self.user_rows.append((username, enabled_var))
+
         def set_user_selection(self, selected):
             for _username, enabled_var in self.user_rows:
                 enabled_var.set(bool(selected))
-                
+
         def collect_options(self):
             csv_text = self.csv_path_var.get().strip()
             if not csv_text:
@@ -1513,14 +2164,14 @@ def run_gui():
             csv_path = Path(csv_text)
             if not csv_path.exists():
                 raise ValueError("Selected CSV file does not exist.")
-                
+
             try:
                 threshold = float(self.threshold_var.get())
             except ValueError as exc:
                 raise ValueError("Skip threshold must be a number.") from exc
             if not math.isfinite(threshold) or threshold <= 0:
                 raise ValueError("Skip threshold must be greater than zero.")
-                
+
             selected_actions = []
             weights = {}
             for action, enabled_var, weight_var in self.action_rows:
@@ -1529,27 +2180,37 @@ def run_gui():
                 try:
                     weight = float(weight_var.get())
                 except ValueError as exc:
-                    raise ValueError(f"Weight for {action!r} must be a number.") from exc
+                    raise ValueError(
+                        f"Weight for {action!r} must be a number."
+                    ) from exc
                 if not math.isfinite(weight) or weight < 0:
-                    raise ValueError(f"Weight for {action!r} must be a non-negative finite number.")
+                    raise ValueError(
+                        f"Weight for {action!r} must be a non-negative finite number."
+                    )
                 selected_actions.append(action)
                 weights[action] = weight
             if not selected_actions:
                 raise ValueError("Select at least one action.")
-                
+
             selected_users = None
             if self.user_rows:
-                selected_users = [username for username, enabled_var in self.user_rows if enabled_var.get()]
+                selected_users = [
+                    username
+                    for username, enabled_var in self.user_rows
+                    if enabled_var.get()
+                ]
                 if not selected_users:
                     raise ValueError("Select at least one user.")
             return csv_path, threshold, selected_actions, weights, selected_users
-            
+
         def generate_report(self):
             self._set_busy(True)
             self.status_var.set("Generating report...")
-            
+
             def do_generate():
-                csv_path, threshold, selected_actions, weights, selected_users = self.collect_options()
+                csv_path, threshold, selected_actions, weights, selected_users = (
+                    self.collect_options()
+                )
                 report = build_user_productivity_report(
                     csv_path,
                     threshold_minutes=threshold,
@@ -1557,9 +2218,11 @@ def run_gui():
                     action_weights=weights,
                     selected_users=selected_users,
                 )
-                markdown = render_user_productivity_md(report, input_source=str(csv_path))
+                markdown = render_user_productivity_md(
+                    report, input_source=str(csv_path)
+                )
                 return report, markdown
-            
+
             def on_done(result):
                 report, markdown = result
                 self.current_report = report
@@ -1567,65 +2230,83 @@ def run_gui():
                 self.render_result_views(report)
                 medians = _report_numeric_medians(report)
                 median_score = medians.get("score")
-                score_text = f"{median_score:.1f}" if median_score is not None else "n/a"
+                score_text = (
+                    f"{median_score:.1f}" if median_score is not None else "n/a"
+                )
                 self.status_var.set(f"Report generated. Median score: {score_text}.")
                 self._set_busy(False)
-            
+
             def on_error(exc):
                 from tkinter import messagebox
+
                 messagebox.showerror("Report error", str(exc))
                 self.status_var.set("Report generation failed.")
                 self._set_busy(False)
-            
+
             self._run_in_background(do_generate, on_done, on_error)
-            
+
         def render_result_views(self, report):
             medians = _report_numeric_medians(report)
             self._populate_ranking_tree(report, medians)
-            
+
             # Populate details tree
             details_data = []
-            for row in sorted(report.get("matrix", []), key=lambda item: (item.get("display_name") or item.get("username", "")).lower()):
+            for row in sorted(
+                report.get("matrix", []),
+                key=lambda item: (
+                    item.get("display_name") or item.get("username", "")
+                ).lower(),
+            ):
                 username = row.get("display_name") or row.get("username", "")
                 for action in report.get("actions", []):
                     total = row.get("total_volume_cells", {}).get(action, "")
                     if str(total).strip() in ("", "0"):
                         continue
-                    details_data.append({
-                        "user": username,
-                        "action": action,
-                        "total": total,
-                        "avg_daily": row.get("volume_cells", {}).get(action, ""),
-                        "volume_delta": row.get("volume_deltas", {}).get(action, ""),
-                        "avg_duration": row.get("cells", {}).get(action, ""),
-                        "duration_delta": row.get("deltas", {}).get(action, ""),
-                        "samples": row.get("counts", {}).get(action, ""),
-                    })
-            self._populate_treeview(self.details_tree, details_data, [
-                ("user", "User", 180, "w"),
-                ("action", "Action", 220, "w"),
-                ("total", "Total", 90, "e"),
-                ("avg_daily", "Avg Daily", 100, "e"),
-                ("volume_delta", "Volume Delta", 110, "e"),
-                ("avg_duration", "Avg Duration", 110, "e"),
-                ("duration_delta", "Duration Delta", 120, "e"),
-                ("samples", "Samples", 90, "e"),
-            ])
-            
+                    details_data.append(
+                        {
+                            "user": username,
+                            "action": action,
+                            "total": total,
+                            "avg_daily": row.get("volume_cells", {}).get(action, ""),
+                            "volume_delta": row.get("volume_deltas", {}).get(
+                                action, ""
+                            ),
+                            "avg_duration": row.get("cells", {}).get(action, ""),
+                            "duration_delta": row.get("deltas", {}).get(action, ""),
+                            "samples": row.get("counts", {}).get(action, ""),
+                        }
+                    )
+            self._populate_treeview(
+                self.details_tree,
+                details_data,
+                [
+                    ("user", "User", 180, "w"),
+                    ("action", "Action", 220, "w"),
+                    ("total", "Total", 90, "e"),
+                    ("avg_daily", "Avg Daily", 100, "e"),
+                    ("volume_delta", "Volume Delta", 110, "e"),
+                    ("avg_duration", "Avg Duration", 110, "e"),
+                    ("duration_delta", "Duration Delta", 120, "e"),
+                    ("samples", "Samples", 90, "e"),
+                ],
+            )
+
             self.result_text.delete("1.0", self.tk.END)
             self.result_text.insert("1.0", self.current_markdown)
-            
+
         def _populate_ranking_tree(self, report, medians):
             """Populate the ranking treeview."""
             # Clear existing items
             for item in self.ranking_tree.get_children():
                 self.ranking_tree.delete(item)
-                
+
             # Get sorted rows
-            rows = _sort_ranking_rows(report.get("ranking", []), 
-                                    self._selected_ranking_metric(), 
-                                    descending=self.ranking_desc_var.get())
-                                    
+            rows = _sort_ranking_rows(
+                report.get("ranking", []),
+                self._selected_ranking_metric(),
+                descending=self.ranking_desc_var.get(),
+            )
+
             # Insert data
             for i, row in enumerate(rows):
                 values = (
@@ -1642,14 +2323,14 @@ def run_gui():
                 )
                 tag = "evenrow" if i % 2 == 0 else "oddrow"
                 self.ranking_tree.insert("", "end", values=values, tags=(tag,))
-                
+
         def _clear_tree(self, tree):
             for item in tree.get_children(""):
                 tree.delete(item)
-                
+
         def export_markdown(self):
             from tkinter import filedialog, messagebox
-            
+
             if not self.current_markdown:
                 self.generate_report()
                 if not self.current_markdown:
@@ -1668,15 +2349,15 @@ def run_gui():
                 self.status_var.set("Export failed.")
                 return
             self.status_var.set(f"Exported {output_path}.")
-            
+
         def _selected_ranking_metric(self):
             return RANKING_SORT_LABELS.get(self.ranking_sort_var.get(), "score")
-            
+
         def _on_ranking_sort_changed(self, _event=None):
             metric = self._selected_ranking_metric()
             self.ranking_desc_var.set(RANKING_SORT_DEFAULT_DESC.get(metric, True))
             self.apply_ranking_sort()
-            
+
         def apply_ranking_sort(self):
             if not self.current_report:
                 return
@@ -1767,7 +2448,9 @@ RANKING_SORT_OPTIONS = [
     ("user", "User", False),
 ]
 RANKING_SORT_LABELS = {label: key for key, label, _default_desc in RANKING_SORT_OPTIONS}
-RANKING_SORT_DEFAULT_DESC = {key: default_desc for key, _label, default_desc in RANKING_SORT_OPTIONS}
+RANKING_SORT_DEFAULT_DESC = {
+    key: default_desc for key, _label, default_desc in RANKING_SORT_OPTIONS
+}
 
 
 # Expose UserProductivityApp for testing (defined inside run_gui)
@@ -1777,12 +2460,17 @@ UserProductivityApp = None
 
 # ===== HELPER FUNCTIONS FOR GUI =====
 
+
 def _report_numeric_medians(report):
     ranking = report.get("ranking", [])
     return {
         "score": _median_numeric(row.get("score") for row in ranking),
-        "weighted_daily": _median_numeric(row.get("weighted_avg_daily_volume") for row in ranking),
-        "weighted_total": _median_numeric(row.get("weighted_total_volume") for row in ranking),
+        "weighted_daily": _median_numeric(
+            row.get("weighted_avg_daily_volume") for row in ranking
+        ),
+        "weighted_total": _median_numeric(
+            row.get("weighted_total_volume") for row in ranking
+        ),
         "detail_volume": _median_numeric(
             count
             for row in report.get("matrix", [])
@@ -1793,7 +2481,11 @@ def _report_numeric_medians(report):
 
 
 def _median_numeric(values):
-    numbers = sorted(number for number in (_coerce_float(value) for value in values) if number is not None)
+    numbers = sorted(
+        number
+        for number in (_coerce_float(value) for value in values)
+        if number is not None
+    )
     if not numbers:
         return None
     midpoint = len(numbers) // 2
@@ -1882,6 +2574,7 @@ def _sort_ranking_rows(rows, metric, descending=True):
 
 
 # ===== MAIN ENTRY POINT =====
+
 
 def main(argv=None, gui_runner=run_gui):
     raw_argv = sys.argv[1:] if argv is None else list(argv)
