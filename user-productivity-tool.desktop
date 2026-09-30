@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=User Productivity Tool
+Comment=Analyze user action logs and generate productivity reports
+Exec=python3 /home/meto/workspace/productivity_rates/launch_gui.py
+Icon=/home/meto/workspace/productivity_rates/icon.png
+Terminal=false
+Categories=Office;Utility;
+StartupNotify=true

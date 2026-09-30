@@ -1,0 +1,10 @@
+day,time,username,action
+2024-01-01,09:00:00,user1,Review
+2024-01-01,09:30:00,user1,Write
+2024-01-01,10:00:00,user1,Review
+2024-01-01,09:15:00,user2,Write
+2024-01-01,10:00:00,user2,Debug
+2024-01-02,09:00:00,user1,Write
+2024-01-02,09:30:00,user1,Debug
+2024-01-02,10:00:00,user2,Review
+2024-01-02,10:30:00,user2,Write
