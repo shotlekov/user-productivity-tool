@@ -159,6 +159,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
+## Wiki
+
+Full documentation is available in the project Wiki:
+
+https://github.com/shotlekov/user-productivity-tool/wiki
+
+---
+
 ## Repository
 
 https://github.com/shotlekov/user-productivity-tool
