@@ -2,7 +2,7 @@
 
 A desktop GUI application for analyzing user action logs and generating productivity reports. The tool reads user activity CSV logs, calculates weighted productivity scores, and presents results through a clean, themed interface with sorting and filtering capabilities.
 
-![UI Preview](screenshot_light.png)
+![UI Preview](icon.png)
 
 ---
 
@@ -24,7 +24,7 @@ A desktop GUI application for analyzing user action logs and generating producti
 
 | Light Theme | Dark Theme |
 |-------------|------------|
-| ![Light Theme](screenshot_light.png) | ![Dark Theme](screenshot_dark.png) |
+| ![Light Theme](icon.png) | ![Dark Theme](icon.png) |
 
 ---
 
