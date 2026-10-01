@@ -2,8 +2,6 @@
 
 A desktop GUI application for analyzing user action logs and generating productivity reports. The tool reads user activity CSV logs, calculates weighted productivity scores, and presents results through a clean, themed interface with sorting and filtering capabilities.
 
-![Logo Preview] <img src="logo.png" width="48">
-
 ---
 
 ## Features
