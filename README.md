@@ -66,7 +66,7 @@ build_windows_exe.bat
 ```
 
 This will:
-1. Download and install Python 3.14.7 (if missing)
+1. Download and install Python 3.12.7 (if missing)
 2. Create a virtual environment with PyInstaller
 3. Build a portable `dist\UserProductivityTool.exe`
 

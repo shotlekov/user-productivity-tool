@@ -7,7 +7,7 @@ This tool has no runtime dependencies beyond Python's standard library.
 ### Option A: Fully Automated Build (Recommended)
 
 1. **Double-click `build_windows_exe.bat`.**
-2. If Python is not installed on the machine, the script will **automatically download and install Python 3.14.7** silently.
+2. If Python is not installed on the machine, the script will **automatically download and install Python 3.12.7** silently.
 3. The script creates a virtual environment, installs PyInstaller, and builds the executable.
 4. Use `dist\UserProductivityTool.exe` — it is fully portable.
 
@@ -23,7 +23,7 @@ The executable opens the GUI directly. The Python source copy is `user_productiv
 ## Auto-Installation Details
 
 When Python is not detected, the build script will:
-- Download the official Python 3.14.7 installer from python.org
+- Download the official Python 3.12.7 installer from python.org
 - Install silently with: `/quiet InstallAllUsers=1 PrependPath=1 InstallLauncher=1 Include_test=0 Include_venv=1`
 - Add Python to the system PATH
 - Clean up the installer file

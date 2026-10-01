@@ -22,23 +22,23 @@ if %errorlevel%==0 (
     goto python_ready
 )
 
-echo Python not found. Installing Python 3.14.7 automatically...
+echo Python not found. Installing Python 3.12.7 automatically...
 
 REM Download Python installer
-set PYTHON_URL=https://www.python.org/ftp/python/3.14.7/python-3.14.7-amd64.exe
-set PYTHON_INSTALLER=python-3.14.7-amd64.exe
+set PYTHON_URL=https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe
+set PYTHON_INSTALLER=python-3.12.7-amd64.exe
 
-echo Downloading Python 3.14.7 installer...
+echo Downloading Python 3.12.7 installer...
 powershell -Command "Try { (New-Object System.Net.WebClient).DownloadFile('%PYTHON_URL%', '%PYTHON_INSTALLER%') } Catch { Write-Host 'Download failed: ' + $_.Exception.Message; Exit 1 }"
 
 if not exist "%PYTHON_INSTALLER%" (
     echo ERROR: Failed to download Python installer.
-    echo Please install Python 3.14.7 manually from https://www.python.org/downloads/
+    echo Please install Python 3.12.7 manually from https://www.python.org/downloads/
     pause
     exit /b 1
 )
 
-echo Installing Python 3.14.7 silently (this may take a minute)...
+echo Installing Python 3.12.7 silently (this may take a minute)...
 "%PYTHON_INSTALLER%" /quiet InstallAllUsers=1 PrependPath=1 InstallLauncher=1 Include_test=0 Include_venv=1
 
 if !errorlevel! neq 0 (
@@ -56,7 +56,7 @@ REM Verify python is now available
 where python >nul 2>nul
 if !errorlevel! neq 0 (
     echo ERROR: Python still not found after installation.
-    echo Please ensure Python 3.14.7 was installed correctly.
+    echo Please ensure Python 3.12.7 was installed correctly.
     pause
     exit /b 1
 )
@@ -106,7 +106,8 @@ pyinstaller ^
     --clean ^
     --onefile ^
     --windowed ^
-    --icon=icon.png ^
+    --icon=icon.ico ^
+    --add-data "sample.csv;." ^
     --name UserProductivityTool ^
     user_productivity_tool.py
 

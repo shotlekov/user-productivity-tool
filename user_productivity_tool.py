@@ -980,8 +980,15 @@ def run_gui():
         def _auto_load_sample_csv_test(self):
             """Automatically load sample CSV for testing."""
             import os
+            import sys
 
-            sample_path = os.path.join(os.path.dirname(__file__), "sample.csv")
+            # Handle PyInstaller bundled mode
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.dirname(__file__)
+
+            sample_path = os.path.join(base_path, "sample.csv")
             if os.path.exists(sample_path):
                 self.csv_path_var.set(sample_path)
                 self.browse_csv()  # This will trigger the normal browse_csv flow
